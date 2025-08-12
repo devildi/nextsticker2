@@ -724,6 +724,7 @@ class _MyHomePageState extends State<MyHomePage> {
         if(location.isEmpty){
           location = [0, 0];
         }
+        //print(location);
         cloneTrip.detail[location[0]].dayList.add(item);
         Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
         platform.invokeMethod('InjectOnePoint',item.toJson().toString());

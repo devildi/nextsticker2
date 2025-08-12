@@ -91,7 +91,7 @@ class LastStepState extends State<LastStep> {
       });
       _controller8.text = '';
       Navigator.pushReplacementNamed(context, '/');
-      
+      Provider.of<UserData>(context, listen: false).setIndex([0,0]);
     }catch(err){
       debugPrint(err.toString());
       setState(() {
