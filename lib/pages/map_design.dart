@@ -109,7 +109,9 @@ class MapDesignState extends State<MapDesign> {
 
   void _addADay(){
     cloneData.detail.add(DayDetail(dayList: []));
+    List arrayIndex = [cloneData.detail.length - 1, 0];
     Provider.of<UserData>(context, listen: false).setCloneData(cloneData);
+    Provider.of<UserData>(context, listen: false).setIndex(arrayIndex);
     fedback('已添加空白的一天');
   }
 
