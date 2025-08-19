@@ -570,10 +570,12 @@ class _MyHomePageState extends State<MyHomePage> {
     // if(location.isEmpty){
     //   location = [0, 0];
     // }
-    List indexAndCloneTripItem = indexAndTripItem(cloneTrip, item.nameOfScence);
+    List indexAndCloneTripItem = indexAndTripItem(cloneTrip, item.nameOfScence);//检查是否有重复的点
     List index = indexAndCloneTripItem[1];
     DetailModel tripItem = indexAndCloneTripItem[0];
-    
+    if(index.isNotEmpty){
+      debugPrint('存在重复的点${item.nameOfScence}：在第${index[0] + 1}天第${index[1] + 1}个');
+    }
     if(tripItem.nameOfScence == ''){
       Provider.of<UserData>(context, listen: false).setLoading(true);
       _controller1.text = item.nameOfScence;
@@ -714,7 +716,7 @@ class _MyHomePageState extends State<MyHomePage> {
     //   });
     // }
     
-    void save(cat, location){
+    void save(cat, location)async {
       if(tripItem.nameOfScence == ''){
         debugPrint('新建行程');
         item.category = cat;
@@ -725,10 +727,18 @@ class _MyHomePageState extends State<MyHomePage> {
           location = [0, 0];
         }
         //print(location);
-        cloneTrip.detail[location[0]].dayList.add(item);
-        Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
-        platform.invokeMethod('InjectOnePoint',item.toJson().toString());
-        Provider.of<UserData>(context, listen: false).setPoints([]);
+        bool flag = await platform.invokeMethod('InjectOnePoint',item.toJson().toString());
+        if(flag){
+          cloneTrip.detail[location[0]].dayList.add(item);
+          if (!context.mounted) return;
+          Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
+          Provider.of<UserData>(context, listen: false).setPoints([]);
+        }else {
+          if (!context.mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.red, content: Text('添加点出错，请稍后再试！', textAlign: TextAlign.center)),
+          );
+        }
       } else {
         debugPrint('更改行程');
         cloneTrip.detail[index[0]].dayList[index[1]].nameOfScence = _controller1.text;
@@ -741,8 +751,12 @@ class _MyHomePageState extends State<MyHomePage> {
         //cloneTrip.detail[index[0]].dayList[index[1]].picURL = _controller3.text;
         //print(cloneTrip.tripName);
         Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
-        platform.invokeMethod('InjectOnePoint',cloneTrip.detail[index[0]].dayList[index[1]].toJson().toString());
+        bool flag = await platform.invokeMethod('InjectOnePoint',cloneTrip.detail[index[0]].dayList[index[1]].toJson().toString());
+        if(flag){
+
+        }
       }
+      if (!context.mounted) return;
       Provider.of<UserData>(context, listen: false).setPicBing('');
       Provider.of<UserData>(context, listen: false).setDes('');
       Navigator.of(context).pop();
@@ -804,6 +818,21 @@ class _MyHomePageState extends State<MyHomePage> {
                           //placeholder: (context, url) => const CircularProgressIndicator(), // 加载中的占位符
                           errorWidget: (context, url, error) => const Icon(Icons.error),
                         ),
+                      )
+                      :Container(),
+                      const SizedBox(height: 20),
+                      index.isNotEmpty
+                      ?Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('第${index[0] + 1}天第${index[1] + 1}个景点', style: const TextStyle(fontSize: 16)),
+                          // GestureDetector(
+                          //   onTap: () {
+                            
+                          //   },
+                          //   child: const Icon(Icons.close, color: Colors.red),
+                          // )
+                        ],
                       )
                       :Container(),
                       const SizedBox(height: 20),
@@ -1446,6 +1475,7 @@ class _MyHomePageState extends State<MyHomePage> {
               initUserData: initUserData,
               netWorkIsOn: netWorkIsOn,
               setTripData: setTripData,
+              getMoreTripData: _addMoreData,
             )
           ]
         ),

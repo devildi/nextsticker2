@@ -61,7 +61,7 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
     RequestQueue requestQueue;
     PoiSearch.Query query;
     PoiSearch poiSearch;
-
+    private MethodChannel.Result pendingResult;
     private Marker marker;
 
     GaodeDesign(Context context, BinaryMessenger messenger, int id, Map<String, Object> creationParams, Activity activity) {
@@ -143,6 +143,8 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
         if ("startLoaction".equals(call.method)) {
             String text = (String) call.arguments;
         }else if ("InjectOnePoint".equals(call.method)) {
+            Log.e("flutterMethod", call.method);
+            this.pendingResult = result;
             String pointString = (String) call.arguments;
             initData(pointString);
         }else if ("findPOI".equals(call.method)) {
@@ -194,8 +196,14 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
                 //aMap.setInfoWindowAdapter(this);
                 setCenter(marker);
                 marker.showInfoWindow();
+                if(pendingResult != null){
+                    pendingResult.success(true);
+                }
             }catch(Exception e){
                 Log.e("InjectOnePoint", String.valueOf(e));
+                if(pendingResult != null){
+                    pendingResult.success(false);
+                }
             }
         }
     }

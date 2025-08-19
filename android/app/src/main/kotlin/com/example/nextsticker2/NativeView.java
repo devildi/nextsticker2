@@ -134,10 +134,6 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     Notification.Builder builder;
     NotificationChannel channel;
     NativeView(Context context, BinaryMessenger messenger, int id, Map<String, Object> creationParams, Activity activity) {
-//        textView = new TextView(context);
-//        textView.setTextSize(72);
-//        textView.setBackgroundColor(Color.rgb(255, 255, 255));
-//        textView.setText("Rendered on a native Android view (id: " + id + ")");
         container = new FrameLayout(context);
         container.setLayoutParams(new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -192,12 +188,6 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                     e.printStackTrace();
                 }
             });
-//            aMap.setCustomMapStyle(
-//                    new com.amap.api.maps.model.CustomMapStyleOptions()
-//                            .setEnable(true)
-//                            .setStyleDataPath(loader.getLookupKeyForAsset("/assets/mystyle/style.data"))
-//                            .setStyleExtraPath(loader.getLookupKeyForAsset("/assets/mystyle/style_extra.data"))
-//            );
         }
         //地图控件
         mUiSettings = aMap.getUiSettings();
@@ -831,13 +821,6 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
 
     public static void goGaodeMap(Context context, double latitude, double longtitude, int cat) {
         if (isInstallApk(context, "com.autonavi.minimap")) {
-            //Uri uri = Uri.parse("androidamap://com.autonavi.minimap/path?sourceApplication=NextSticker&lat=" + latitude + "&lon=" + longtitude + "&dev=0");
-//            Intent launchBrowser = new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.youku.com"));
-//            launchBrowser.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-//            context.startActivity(launchBrowser);
-            //"androidamap://navi?sourceApplication=appname&poiname=fangheng&lat=26.57&lon=106.71&dev=1&style=2"
-            // amapuri://route/plan/?sname=A&did=BGVIS2&dlat=39.98848272&dlon=116.47560823&dname=B&dev=0&t=0
-            //intent.setPackage("com.autonavi.minimap");
             Intent intent = new Intent("android.intent.action.VIEW", android.net.Uri.parse("amapuri://route/plan/?dlat="+ latitude + "&dlon=" + longtitude + "&dev=0&t=" + cat));
             intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             context.startActivity(intent);

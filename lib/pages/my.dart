@@ -21,6 +21,7 @@ class Myself extends StatefulWidget {
   final Function initUserData;
   final bool netWorkIsOn;
   final Function setTripData;
+  final Function getMoreTripData;
   const Myself({
     Key? key,
     required this.openSnackBar,
@@ -36,6 +37,7 @@ class Myself extends StatefulWidget {
     required this.initUserData,
     required this.netWorkIsOn,
     required this.setTripData,
+    required this.getMoreTripData,
   }): super(key: key);
   @override
   MyselfState createState() => MyselfState();
@@ -75,6 +77,7 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
       builder: (context) => Diy(
         platform: widget.platform,
         setTripData: widget.setTripData,
+        getMore: widget.getMoreTripData
       )
     ));
   }

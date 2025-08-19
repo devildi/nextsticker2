@@ -262,7 +262,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
           ),
         );
       }catch(err){
-        print(err);
+        debugPrint(err.toString());
         if (!context.mounted) return;
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -276,10 +276,10 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
   Future<String> callNativeMethod(str) async {
     try {
       final result = await platform.invokeMethod('getLocation', str);
-      print('原生方法返回: ${result['latLng']['longitude']},${result['latLng']['latitude']}');
+      debugPrint('原生方法返回: ${result['latLng']['longitude']},${result['latLng']['latitude']}');
       return '${result['latLng']['longitude']},${result['latLng']['latitude']}';
     } on PlatformException catch (e) {
-      print("调用失败: '${e.message}'");
+      debugPrint("调用失败: '${e.message}'");
       return 'error';
     }
   }

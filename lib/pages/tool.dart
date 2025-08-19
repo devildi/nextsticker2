@@ -42,6 +42,7 @@ class ToolState extends State<Tool> {
           builder: (context) => Diy(
             platform: widget.platform,
             setTripData: (){},
+            getMore: (){}
           )
         ));
       }

@@ -112,6 +112,9 @@ class MapDesignState extends State<MapDesign> {
     List arrayIndex = [cloneData.detail.length - 1, 0];
     Provider.of<UserData>(context, listen: false).setCloneData(cloneData);
     Provider.of<UserData>(context, listen: false).setIndex(arrayIndex);
+    setState(() {
+      indexNum = cloneData.detail.length - 1;
+    });
     fedback('已添加空白的一天');
   }
 

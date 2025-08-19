@@ -127,7 +127,7 @@ class ArrangeState extends State<Arrange> {
       if (item.nameOfScence.startsWith("第")) {
         currentDay = DayDetail(dayList: []);
         grouped.add(currentDay);
-        print(grouped);
+        debugPrint(grouped.toString());
         // if (currentDay.dayList.isNotEmpty) {
         //   grouped.add(currentDay);
         //   currentDay = DayDetail(dayList: []);
