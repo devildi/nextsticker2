@@ -1145,10 +1145,12 @@ class _MyHomePageState extends State<MyHomePage> {
       Provider.of<UserData>(context, listen: false).setLoading(true);
       AuthModel auth = Provider.of<UserData>(context, listen: false).auth;
       try{
+        AllStoryModel storys = await StoryDao.fetch(1);
         AllStoryModel authorStorys = await StoryDao.fetchByAuthor(1, auth.uid);
         AllStoryModel likesStorys = await StoryDao.likeOrCollect(1, auth.uid, 'likes');
         AllStoryModel collectStorys = await StoryDao.likeOrCollect(1, auth.uid, 'comments');
         setState((){
+          storyList = storys.storyList;
           storyListAuthor = authorStorys.storyList;
           storyListLikes = likesStorys.storyList;
           storyListCollects = collectStorys.storyList;

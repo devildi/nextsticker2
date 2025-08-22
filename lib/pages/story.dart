@@ -8,11 +8,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'dart:math';
 import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
-//import 'package:nextsticker2/widgets/animate_edit.dart';
+import 'package:nextsticker2/widgets/animate_edit.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:nextsticker2/dao/story_dao.dart';
 import 'package:flutter/foundation.dart';
+import 'package:nextsticker2/widgets/common_image.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
 class Story extends StatefulWidget {
   final List storys;
@@ -195,7 +197,7 @@ class StoryState extends State<Story> {
                     comment: widget.comment,
                     uid: widget.auth.uid,
                     openSnackBar: widget.openSnackBar,
-                    initUserData: widget.initUserData
+                    initUserData: widget.initUserData,
                   );
               },
             )
@@ -218,13 +220,13 @@ class StoryState extends State<Story> {
           )
         )
       ),
-      // floatingActionButton: MyAnimateEdit(
-      //   openSnackBar: widget.openSnackBar,
-      //   auth: widget.auth.uid,
-      //   platform: widget.platform,
-      //   socket: widget.socket,
-      //   initUserData: widget.initUserData
-      // )
+      floatingActionButton: MyAnimateEdit(
+        openSnackBar: widget.openSnackBar,
+        auth: widget.auth.uid,
+        platform: widget.platform,
+        socket: widget.socket,
+        initUserData: widget.initUserData
+      )
     );
   }
 }
@@ -290,6 +292,53 @@ class _Item extends StatelessWidget {
           ));
         }
       },
+      onLongPress: (){if(storys[index].author.name == Provider.of<UserData>(context, listen: false).auth.name){
+        showDialog(
+          context: context,
+          builder: (BuildContext context) {
+            return AlertDialog(
+              title: const Text('删除'),
+              content: const Text('是否删除该内容？'),
+              actions: <Widget>[
+                TextButton(
+                  child: const Text('取消'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                TextButton(
+                  child: const Text('确定'),
+                  onPressed: () async{
+                    if(storys[index].articleType == 3){
+                      try {
+                        await StoryDao.deleteStory(storys[index].articleId, [storys[index].videoURL, storys[index].picURL]);
+                        CommonUtils.deleteLocalFilesAsync([storys[index].localVideoURL, storys[index].localVideoThumbnailURL]);
+                        initUserData(true);
+                        openSnackBar('已删除！', 1);
+                        if (!context.mounted) return;
+                        Navigator.of(context).pop();
+                      } catch (e) {
+                        debugPrint(e.toString());
+                        openSnackBar('网络错误，删除失败！', 1);
+                      }
+                    } else if(storys[index].articleType == 2) {
+                       try {
+                        await StoryDao.deleteStory(storys[index].articleId, storys[index].album.map((e) => e.key).toList());
+                        CommonUtils.deleteLocalFilesAsync(storys[index].album.map((e) => e.key.toString()).toList());
+                        initUserData(true);
+                        openSnackBar('已删除！', 1);
+                        if (!context.mounted) return;
+                        Navigator.of(context).pop();
+                      } catch (e) {
+                        debugPrint(e.toString());
+                        openSnackBar('网络错误，删除失败！', 1);
+                      }
+                    }
+                  },
+                )
+              ],
+            );
+          }
+        );
+      }},
       child: Card(
         child: PhysicalModel(
           color: Colors.transparent,
@@ -306,7 +355,20 @@ class _Item extends StatelessWidget {
                   ),
                   width: MediaQuery.of(context).size.width / 2,
                   height: (MediaQuery.of(context).size.width / 2) * storys[index].height / storys[index].width,
-                  child: CachedNetworkImage(
+                  child: storys[index].articleType != null && storys[index].articleType == 2 || storys[index].articleType == 3
+                  // ?CachedNetworkImage(
+                  //   imageUrl: storys[index].picURL,
+                  //   fit: BoxFit.cover,
+                  // )
+                  ?ImageWithFallback(
+                    remoteURL: storys[index].picURL,
+                    localURL: storys[index].articleType == 2 ? storys[index].localURL[0] : storys[index].localVideoThumbnailURL,
+                    width: storys[index].width.toDouble(),
+                    picWidth: storys[index].width.toDouble(),
+                    picHeight: storys[index].height.toDouble(),
+                    name: storys[index].articleName
+                  )
+                  :CachedNetworkImage(
                     imageUrl: storys[index].picURL,
                     fit: BoxFit.cover,
                   ),

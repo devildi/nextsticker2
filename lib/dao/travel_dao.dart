@@ -3,10 +3,10 @@ import 'package:dio/dio.dart';
 import 'dart:convert'; 
 import 'package:nextsticker2/model/travel_model.dart';
 
-const String urlBase = "https://nextsticker.cn/";
+//const String urlBase = "https://nextsticker.cn/";
 //const String urlBase = "http://10.0.2.2:4000/";
 //const String urlBase = "http://localhost:4000/";
-//const String urlBase = "http://172.20.10.13:4000/";
+const String urlBase = "http://172.20.10.13:4000/";
 
 const urL = '${urlBase}api/trip/get?uid=';
 const urLForAllTrip = '${urlBase}api/trip/getAllTrip?';

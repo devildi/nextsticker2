@@ -128,10 +128,12 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
     }
   }
 
-  void upToServer(body, fn, title, content, uid, initUserData) async{
+  void upToServer(body, fn, title, content, uid, initUserData, medias) async{
     List picArr = [];
+    List localURL = [];
     for (var i = 0; i < body.length; i++) {
       picArr.add(body[i].toJson());
+      localURL.add(medias[i].path);
     }
     try{
       dynamic res = await StoryDao.poMicro({
@@ -142,13 +144,14 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
         'height': body[0].height,
         'articleType': 2,
         'album': picArr,
+        'localURL': localURL,
         'author': uid,
       });
       if(res != null){
         setState(() {
           uploading = false;
           Navigator.of(context).pop();
-          fn('发布成功！请下拉刷新！', 2);
+          fn('发布成功！', 1);
           initUserData(true);
         });
         clear();
@@ -240,7 +243,7 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
       tasks.add(startUploadToQiniu(token, medias[i].path));
     }
     List body = await Future.wait(tasks);
-    upToServer(body, fn, title, content, uid, initUserData);
+    upToServer(body, fn, title, content, uid, initUserData, medias);
   }
 
   void _titleChanged(String str){
@@ -305,7 +308,7 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
           ),
           TextButton(
             onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(openSnackBar, medias, uid, initUserData)),
-            child: Text('发布', style: TextStyle(color: (medias.isEmpty || title == '' || content == '' ?Colors.grey: Colors.white))),
+            child: Text('发布', style: TextStyle(color: (medias.isEmpty || title == '' || content == '' ?Colors.grey: Colors.black))),
           )
         ]
       ),

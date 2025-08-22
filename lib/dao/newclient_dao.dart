@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 
-const String urlBase = "https://nextsticker.cn/";
+//const String urlBase = "https://nextsticker.cn/";
 //const String urlBase = "http://10.0.2.2:4000/";
 //const String urlBase = "http://localhost:4000/";
-//const String urlBase = "http://172.20.10.13:4000/";
+const String urlBase = "http://172.20.10.13:4000/";
 
 const url = '${urlBase}api/users/newClient';
 const loginUrl = '${urlBase}api/users/login';

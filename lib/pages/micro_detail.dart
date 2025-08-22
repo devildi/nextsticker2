@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 //import 'package:flutter_swiper/flutter_swiper.dart';
 import 'package:card_swiper/card_swiper.dart';
 import 'dart:math';
-import 'package:cached_network_image/cached_network_image.dart';
+//import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nextsticker2/model/article_model.dart';
 import 'package:video_player/video_player.dart';
 import 'package:nextsticker2/dao/story_dao.dart';
 import 'package:provider/provider.dart';
 import 'package:nextsticker2/store/store.dart';
 import 'package:nextsticker2/model/travel_model.dart';
+import 'package:nextsticker2/widgets/common_image.dart';
+import 'dart:io';
+import 'package:dio/dio.dart';
 
 class MicroDetail extends StatefulWidget {
   final ArticleModel articleFromStoryPage;
@@ -41,7 +44,7 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
 
   late VideoPlayerController _controller;
   bool isReady = false;
-
+  String? localVideoPath;
   late ArticleModel item;
 
   final TextEditingController _textController = TextEditingController();
@@ -54,15 +57,29 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
     super.initState();
     _focus.addListener(_onFocusChange);
     item = widget.articleFromStoryPage;
-    //_controller = VideoPlayerController.asset("assets/video1.mp4")
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.articleFromStoryPage.videoURL == '' ? 'https://cdn.moji.com/websrc/video/video621.mp4' : widget.articleFromStoryPage.videoURL))
-    ..initialize().then((_) {
-      setState(() {
-        isReady = true;
-      });
-      _controller.play();
-      _controller.setLooping(true);
+    _initVideo();
+  }
+
+  Future<void> _initVideo() async {
+    final url = widget.articleFromStoryPage.videoURL == '' 
+      ? 'https://cdn.moji.com/websrc/video/video621.mp4' 
+      : widget.articleFromStoryPage.videoURL;
+    final filePath = widget.articleFromStoryPage.localVideoURL;
+    final file = File(filePath);
+    if (await file.exists()) {
+      localVideoPath = filePath;
+      _controller = VideoPlayerController.file(file);
+      debugPrint('${widget.articleFromStoryPage.articleName}的本地视频存在，直接使用');
+    } else {
+      _controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      _downloadAndSave(url, filePath);
+    }
+    await _controller.initialize();
+    setState(() {
+      isReady = true;
     });
+    _controller.play();
+    _controller.setLooping(true);
   }
 
   void toBottom(){
@@ -72,6 +89,24 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
         curve: Curves.ease
       );
     }   
+  }
+
+  Future<void> _downloadAndSave(String url, String savePath) async {
+    try {
+      Dio dio = Dio();
+      await dio.download(
+        url,
+        savePath,
+        onReceiveProgress: (received, total) {
+          if (total != -1) {
+            debugPrint("下载进度: ${(received / total * 100).toStringAsFixed(0)}%");
+          }
+        },
+      );
+      debugPrint("视频已缓存到: $savePath");
+    } catch (e) {
+      debugPrint("下载视频失败: $e");
+    }
   }
 
   void _onFocusChange() {
@@ -211,10 +246,19 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
             borderRadius: BorderRadius.circular(20),
             color: randomColor(),
           ),
-           child: CachedNetworkImage(
-            imageUrl: imgs[0].key,
-            fit: BoxFit.cover
-          ),
+          child: 
+          ImageWithFallback(
+            remoteURL: widget.articleFromStoryPage.picURL,
+            localURL: widget.articleFromStoryPage.localURL[0],
+            width: widget.articleFromStoryPage.width.toDouble(),
+            picWidth: widget.articleFromStoryPage.width.toDouble(),
+            picHeight: widget.articleFromStoryPage.height.toDouble(),
+            name: widget.articleFromStoryPage.articleName
+          )
+          // CachedNetworkImage(
+          //   imageUrl: imgs[0].key,
+          //   fit: BoxFit.cover
+          // ),
         );
     } else {
       return 
@@ -233,7 +277,19 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
                     decoration: BoxDecoration(
                       color: randomColor(),
                     ),
-                    child: Image.network(imgs[index].key,fit: BoxFit.cover),
+                    child: 
+                    ImageWithFallback(
+                      remoteURL: imgs[index].key,
+                      localURL: widget.articleFromStoryPage.localURL[index],
+                      width: widget.articleFromStoryPage.width.toDouble(),
+                      picWidth: widget.articleFromStoryPage.width.toDouble(),
+                      picHeight: widget.articleFromStoryPage.height.toDouble(),
+                      name: widget.articleFromStoryPage.articleName
+                    )
+                    // CachedNetworkImage(
+                    //   imageUrl: imgs[index].key,
+                    //   fit: BoxFit.cover
+                    // ),
                   );
             },
             itemCount: imgs.length,

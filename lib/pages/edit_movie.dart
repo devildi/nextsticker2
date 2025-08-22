@@ -11,6 +11,7 @@ import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path/path.dart' as p;
 
 class EditMovie extends StatefulWidget {
   const EditMovie({
@@ -123,7 +124,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
     }
   }
 
-  void upToServer(body, fn, height, width, title, content, uid, initUserData) async{
+  void upToServer(body, fn, height, width, title, content, uid, initUserData, loaclVedioPath, localVideoThumbnailURL) async{
     List picArr = [];
     for (var i = 0; i < body.length; i++) {
       picArr.add(body[i].toJson());
@@ -134,6 +135,8 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         'articleContent': content,
         'picURL': body[1].key,
         'videoURL': body[0].key,
+        'localVideoURL': loaclVedioPath,
+        'localVideoThumbnailURL': localVideoThumbnailURL,
         'width': width,
         'height': height,
         'articleType': 3,
@@ -143,7 +146,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         setState(() {
           uploading = false;
           Navigator.of(context).pop();
-          fn('发布成功！请下拉刷新！', 2);
+          fn('发布成功！', 1);
           initUserData(true);
         });
       }
@@ -186,9 +189,21 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         imageFormat: ImageFormat.JPEG,
         quality: 25,
       );
+      if (uint8list == null) {
+        throw Exception("生成缩略图失败");
+      }
+      final thumbPath = p.setExtension(res[0].path, ".jpeg");
+      final file = File(thumbPath);
+      await file.writeAsBytes(uint8list);
+      final exists = await file.exists();
+      if (!exists) {
+        throw Exception("缩略图写入失败: $thumbPath");
+      } else {
+        debugPrint('缩略图已保存: $thumbPath');
+      }
       setState(() {
         medias = res;
-        picData = uint8list;
+        picData = thumbPath;
       });
     }
   }
@@ -236,9 +251,9 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
       uploading = true;
     });
     tasks.add(startUploadToQiniu(token, medias[0].path, false));
-    tasks.add(startUploadToQiniu(token, picData, true));
+    tasks.add(startUploadToQiniu(token, picData, false));
     List body = await Future.wait(tasks);
-    upToServer(body, fn, _controller.value.size.height, _controller.value.size.width, title, content, uid, initUserData);
+    upToServer(body, fn, _controller.value.size.height, _controller.value.size.width, title, content, uid, initUserData, medias[0].path, picData);
   }
 
   void _titleChanged(String str){
@@ -278,7 +293,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         actions:<Widget>[
           TextButton(
             onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(openSnackBar, uid, initUserData)),
-            child: Text('发布', style: TextStyle(color: (medias.isEmpty|| title == '' || content == '' ?Colors.grey: Colors.white))),
+            child: Text('发布', style: TextStyle(color: (medias.isEmpty|| title == '' || content == '' ?Colors.grey: Colors.black))),
           )
         ]
       ),
