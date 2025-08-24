@@ -362,7 +362,7 @@ class _Item extends StatelessWidget {
                   // )
                   ?ImageWithFallback(
                     remoteURL: storys[index].picURL,
-                    localURL: storys[index].articleType == 2 ? storys[index].localURL[0] : storys[index].localVideoThumbnailURL,
+                    resourceId: CommonUtils.removeBaseUrl(storys[index].picURL),
                     width: storys[index].width.toDouble(),
                     picWidth: storys[index].width.toDouble(),
                     picHeight: storys[index].height.toDouble(),

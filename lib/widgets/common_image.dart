@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-//import 'package:nextsticker2/tools/tools.dart';
+import 'package:nextsticker2/tools/tools.dart';
 import 'dart:io';
 import 'package:dio/dio.dart';
 
 class ImageWithFallback extends StatefulWidget {
   final String remoteURL;
-  final String localURL;
+  final String resourceId;
   final double width;
   final double picWidth;
   final double picHeight;
@@ -15,7 +15,7 @@ class ImageWithFallback extends StatefulWidget {
   const ImageWithFallback({
     Key? key,
     required this.remoteURL,
-    required this.localURL,
+    required this.resourceId,
     required this.name,
     required this.width,
     required this.picWidth,
@@ -32,15 +32,15 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
   @override
   void initState() {
     super.initState();
-    _checkFile(widget.remoteURL, widget.localURL, widget.name);
+    _checkFile(widget.remoteURL, widget.resourceId, widget.name);
   }
 
-  Future<void> _checkFile(remoteURL, localURL, name) async {
-    final file = File(localURL);
-    final exists = await file.exists();
+  Future<void> _checkFile(remoteURL, resourceId, name) async {
+    //final file = File(resourceId);
+    final exists = await CommonUtils.isFileExist(resourceId);
     if (!exists) {
       // 异步下载图片保存到本地
-      _downloadImage(remoteURL, localURL);
+      _downloadImage(remoteURL, await CommonUtils.getLocalURLForResource(resourceId));
       debugPrint('$name的图片不存在，开始下载...');
     } else{
       debugPrint('$name使用本地图片');
@@ -81,7 +81,7 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
       height: height,
       child: fileExists
       ? Image.file(
-          File(widget.localURL),
+          File(widget.resourceId),
           fit: BoxFit.cover,
         )
       : CachedNetworkImage(

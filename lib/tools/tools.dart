@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'dart:io';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 class CommonUtils {
   static Color randomColor() {
@@ -79,5 +81,38 @@ class CommonUtils {
     Future.delayed(duration ?? const Duration(seconds: 2)).then((value) {
       overlayEntry.remove();
     });
+  }
+
+  // 获取本地文件路径（基于资源 ID）
+  static Future<String> getLocalURLForResource(String resourceId) async {
+    // 获取应用的本地缓存目录
+    final dir = await getApplicationDocumentsDirectory();
+    // 使用资源 ID 作为文件名
+    //final filename = '$resourceId.jpeg';  // 你可以根据需要修改文件扩展名
+    return p.join(dir.path, resourceId);  // 拼接文件路径
+  }
+
+  // 获取本地文件路径（基于资源 ID）
+  static Future<File> getLocalFileForResource(String resourceId) async {
+    // 获取应用的本地缓存目录
+    final dir = await getApplicationDocumentsDirectory();
+    // 使用资源 ID 作为文件名
+    //final filename = '$resourceId.jpeg';  // 你可以根据需要修改文件扩展名
+    return File(p.join(dir.path, resourceId));  // 拼接文件路径
+  }
+
+  // 检查本地是否已存在该资源文件
+  static Future<bool> isFileExist(String resourceId) async {
+    final file = await getLocalFileForResource(resourceId);
+    return await file.exists();  // 判断文件是否存在
+  }
+
+  static String removeBaseUrl(String url) {
+    // 检查 URL 是否以 "http://nextsticker.xyz/" 开头，并去除它
+    const baseUrl = 'http://nextsticker.xyz/';
+    if (url.startsWith(baseUrl)) {
+      return url.substring(baseUrl.length);  // 去掉前缀部分
+    }
+    return url;  // 如果没有这个前缀，返回原始 URL
   }
 }

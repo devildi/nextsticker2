@@ -11,7 +11,6 @@ import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path/path.dart' as p;
 
 class EditMovie extends StatefulWidget {
   const EditMovie({
@@ -89,7 +88,6 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
       ReturnBody body = ReturnBody.fromJson(response.rawData);
       return body;
     } catch(error){
-      
       if (error is StorageError) {
         switch (error.type) {
           case StorageErrorType.CONNECT_TIMEOUT:
@@ -124,7 +122,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
     }
   }
 
-  void upToServer(body, fn, height, width, title, content, uid, initUserData, loaclVedioPath, localVideoThumbnailURL) async{
+  void upToServer(body, fn, height, width, title, content, uid, initUserData) async{
     List picArr = [];
     for (var i = 0; i < body.length; i++) {
       picArr.add(body[i].toJson());
@@ -135,8 +133,6 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         'articleContent': content,
         'picURL': body[1].key,
         'videoURL': body[0].key,
-        'localVideoURL': loaclVedioPath,
-        'localVideoThumbnailURL': localVideoThumbnailURL,
         'width': width,
         'height': height,
         'articleType': 3,
@@ -189,21 +185,21 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         imageFormat: ImageFormat.JPEG,
         quality: 25,
       );
-      if (uint8list == null) {
-        throw Exception("生成缩略图失败");
-      }
-      final thumbPath = p.setExtension(res[0].path, ".jpeg");
-      final file = File(thumbPath);
-      await file.writeAsBytes(uint8list);
-      final exists = await file.exists();
-      if (!exists) {
-        throw Exception("缩略图写入失败: $thumbPath");
-      } else {
-        debugPrint('缩略图已保存: $thumbPath');
-      }
+      // if (uint8list == null) {
+      //   throw Exception("生成缩略图失败");
+      // }
+      // final thumbPath = p.setExtension(res[0].path, ".jpeg");
+      // final file = File(thumbPath);
+      // await file.writeAsBytes(uint8list);
+      // final exists = await file.exists();
+      // if (!exists) {
+      //   throw Exception("缩略图写入失败: $thumbPath");
+      // } else {
+      //   debugPrint('缩略图已保存: $thumbPath');
+      // }
       setState(() {
         medias = res;
-        picData = thumbPath;
+        picData = uint8list;
       });
     }
   }
@@ -251,9 +247,9 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
       uploading = true;
     });
     tasks.add(startUploadToQiniu(token, medias[0].path, false));
-    tasks.add(startUploadToQiniu(token, picData, false));
+    tasks.add(startUploadToQiniu(token, picData, true));
     List body = await Future.wait(tasks);
-    upToServer(body, fn, _controller.value.size.height, _controller.value.size.width, title, content, uid, initUserData, medias[0].path, picData);
+    upToServer(body, fn, _controller.value.size.height, _controller.value.size.width, title, content, uid, initUserData);
   }
 
   void _titleChanged(String str){

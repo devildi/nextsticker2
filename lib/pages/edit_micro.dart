@@ -128,12 +128,10 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
     }
   }
 
-  void upToServer(body, fn, title, content, uid, initUserData, medias) async{
+  void upToServer(body, fn, title, content, uid, initUserData) async{
     List picArr = [];
-    List localURL = [];
     for (var i = 0; i < body.length; i++) {
       picArr.add(body[i].toJson());
-      localURL.add(medias[i].path);
     }
     try{
       dynamic res = await StoryDao.poMicro({
@@ -144,7 +142,6 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
         'height': body[0].height,
         'articleType': 2,
         'album': picArr,
-        'localURL': localURL,
         'author': uid,
       });
       if(res != null){
@@ -243,7 +240,7 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
       tasks.add(startUploadToQiniu(token, medias[i].path));
     }
     List body = await Future.wait(tasks);
-    upToServer(body, fn, title, content, uid, initUserData, medias);
+    upToServer(body, fn, title, content, uid, initUserData);
   }
 
   void _titleChanged(String str){

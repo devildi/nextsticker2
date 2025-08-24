@@ -12,6 +12,7 @@ import 'package:nextsticker2/model/travel_model.dart';
 import 'package:nextsticker2/widgets/common_image.dart';
 import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
 class MicroDetail extends StatefulWidget {
   final ArticleModel articleFromStoryPage;
@@ -64,15 +65,14 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
     final url = widget.articleFromStoryPage.videoURL == '' 
       ? 'https://cdn.moji.com/websrc/video/video621.mp4' 
       : widget.articleFromStoryPage.videoURL;
-    final filePath = widget.articleFromStoryPage.localVideoURL;
-    final file = File(filePath);
-    if (await file.exists()) {
-      localVideoPath = filePath;
+    final resourceId = CommonUtils.removeBaseUrl(url);
+    if (await CommonUtils.isFileExist(resourceId)) {
+      File file = await CommonUtils.getLocalFileForResource(resourceId);
       _controller = VideoPlayerController.file(file);
       debugPrint('${widget.articleFromStoryPage.articleName}的本地视频存在，直接使用');
     } else {
       _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-      _downloadAndSave(url, filePath);
+      _downloadAndSave(url, await CommonUtils.getLocalURLForResource(resourceId));
     }
     await _controller.initialize();
     setState(() {
@@ -249,7 +249,7 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
           child: 
           ImageWithFallback(
             remoteURL: widget.articleFromStoryPage.picURL,
-            localURL: widget.articleFromStoryPage.localURL[0],
+            resourceId: CommonUtils.removeBaseUrl(widget.articleFromStoryPage.picURL),
             width: widget.articleFromStoryPage.width.toDouble(),
             picWidth: widget.articleFromStoryPage.width.toDouble(),
             picHeight: widget.articleFromStoryPage.height.toDouble(),
@@ -280,7 +280,7 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
                     child: 
                     ImageWithFallback(
                       remoteURL: imgs[index].key,
-                      localURL: widget.articleFromStoryPage.localURL[index],
+                      resourceId: CommonUtils.removeBaseUrl(imgs[index].key),
                       width: widget.articleFromStoryPage.width.toDouble(),
                       picWidth: widget.articleFromStoryPage.width.toDouble(),
                       picHeight: widget.articleFromStoryPage.height.toDouble(),
