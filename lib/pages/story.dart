@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:ui' as ui;
 import 'dart:async';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:nextsticker2/widgets/webview.dart';
@@ -9,10 +8,8 @@ import 'dart:math';
 import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
 import 'package:nextsticker2/widgets/animate_edit.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:nextsticker2/dao/story_dao.dart';
-import 'package:flutter/foundation.dart';
 import 'package:nextsticker2/widgets/common_image.dart';
 import 'package:nextsticker2/tools/tools.dart';
 
@@ -172,7 +169,6 @@ class StoryState extends State<Story> {
       appBar: AppBar(
         backgroundColor: Colors.blue,
         leading: Container(),
-        //leading:GestureDetector(child: Image.asset("assets/chatgpt.png"), onTap: () => {debugPrint('chatgpt')}),
         title: const Text('NextSticker', style: TextStyle(color: Colors.white)),
         centerTitle:true,
       ),
@@ -190,6 +186,7 @@ class StoryState extends State<Story> {
               itemBuilder: (context, index) {
                 return 
                   _Item(
+                    key: ValueKey(widget.storys[index].articleId),
                     index: index, 
                     storys: widget.storys,
                     platform: widget.platform,
@@ -271,7 +268,7 @@ class _Item extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: (){
-        if( storys[index].articleType != null && storys[index].articleType == 2 || storys[index].articleType == 3){
+        if(storys[index].articleType != null && storys[index].articleType == 2 || storys[index].articleType == 3){
           Navigator.push(context, MaterialPageRoute(
             //url: '${storys[index].articleURL}'
             builder: (context) => MicroDetail(
@@ -310,7 +307,7 @@ class _Item extends StatelessWidget {
                     if(storys[index].articleType == 3){
                       try {
                         await StoryDao.deleteStory(storys[index].articleId, [storys[index].videoURL, storys[index].picURL]);
-                        CommonUtils.deleteLocalFilesAsync([storys[index].localVideoURL, storys[index].localVideoThumbnailURL]);
+                        await CommonUtils.deleteLocalFilesAsync([CommonUtils.removeBaseUrl(storys[index].picURL), CommonUtils.removeBaseUrl(storys[index].videoURL)]);
                         initUserData(true);
                         openSnackBar('已删除！', 1);
                         if (!context.mounted) return;
@@ -322,7 +319,7 @@ class _Item extends StatelessWidget {
                     } else if(storys[index].articleType == 2) {
                        try {
                         await StoryDao.deleteStory(storys[index].articleId, storys[index].album.map((e) => e.key).toList());
-                        CommonUtils.deleteLocalFilesAsync(storys[index].album.map((e) => e.key.toString()).toList());
+                        await CommonUtils.deleteLocalFilesAsync(storys[index].album.map<String>((e) => CommonUtils.removeBaseUrl(e.key.toString())).toList());
                         initUserData(true);
                         openSnackBar('已删除！', 1);
                         if (!context.mounted) return;
@@ -356,10 +353,6 @@ class _Item extends StatelessWidget {
                   width: MediaQuery.of(context).size.width / 2,
                   height: (MediaQuery.of(context).size.width / 2) * storys[index].height / storys[index].width,
                   child: storys[index].articleType != null && storys[index].articleType == 2 || storys[index].articleType == 3
-                  // ?CachedNetworkImage(
-                  //   imageUrl: storys[index].picURL,
-                  //   fit: BoxFit.cover,
-                  // )
                   ?ImageWithFallback(
                     remoteURL: storys[index].picURL,
                     resourceId: CommonUtils.removeBaseUrl(storys[index].picURL),
@@ -373,8 +366,6 @@ class _Item extends StatelessWidget {
                     fit: BoxFit.cover,
                   ),
                 ),
-                //Picture(url: storys[index].picURL),
-                //Image.network(storys[index].picURL),
                 Container(
                   padding: const EdgeInsets.all(7),
                   child: Text('${storys[index].articleName}',style: const TextStyle(fontSize: 15)),
@@ -430,98 +421,3 @@ class _Item extends StatelessWidget {
   }
 }
 
-class VideoContainer extends StatefulWidget {
-  final String url;
-  final dynamic platform;
-  const VideoContainer({
-    Key? key,
-    required this.url, 
-    required this.platform, 
-    }): super(key: key);
-  @override
-  VideoContainerState createState() => VideoContainerState();
-}
-
-class VideoContainerState extends State<VideoContainer> {
-  dynamic data;
-  @override
-  void initState() {
-    super.initState();
-    if(defaultTargetPlatform == TargetPlatform.iOS){
-      getPoster(widget.url);
-    } else {
-      getPoster(widget.url);
-    }
-  }
-
-  Future getPoster(url)async{
-    try{
-      final uint8list = await VideoThumbnail.thumbnailData(
-        video: url,
-        imageFormat: ImageFormat.JPEG,
-        quality: 25,
-      );
-      setState(() {
-        data = uint8list;
-      });
-    }catch(err){
-      debugPrint(err.toString());
-    }
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return
-      Container(
-        child: data != null
-          ?Image.memory(data, fit: BoxFit.cover)
-          :const Center(
-            child: CircularProgressIndicator(),
-          )
-      );
-  }
-}
-
-class Picture extends StatelessWidget {
-  final String url;
-  const Picture({
-    Key? key,
-    required this.url, 
-  }): super(key: key);
-
-  Future<ui.Image> _getImage(url) {
-    Completer<ui.Image> completer = Completer<ui.Image>();
-    NetworkImage(url)
-      .resolve(const ImageConfiguration())
-      .addListener(ImageStreamListener((ImageInfo info, bool _) {
-        completer.complete(info.image);
-      }));
-    return completer.future;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return 
-      FutureBuilder<ui.Image>(
-        future: _getImage(url),
-        builder: (BuildContext context, AsyncSnapshot<ui.Image> snapshot) {
-          if (snapshot.hasData) {
-            ui.Image image = snapshot.data!;
-            return 
-              SizedBox(
-                width: MediaQuery.of(context).size.width / 2,
-                height: (MediaQuery.of(context).size.width / 2) * image.height / image.width,
-                child: Image.network(url),
-              );
-          } else {
-            return Container();
-          }
-        },
-      );
-    }
-}

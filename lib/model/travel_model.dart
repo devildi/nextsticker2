@@ -104,18 +104,21 @@ class ReturnBody {
   final String width;
   final String height;
   final String key;
+  final String mimeType;
 
   ReturnBody({
     required this.width,
     required this.height,
     required this.key,
+    required this.mimeType,
   });
 
   factory ReturnBody.fromJson(Map<String, dynamic> json) {
     return ReturnBody(
       width: json["width"],
       height: json["height"],
-      key: json["key"]
+      key: json["key"],
+      mimeType: json["mimeType"],
     );
   }
 
@@ -123,7 +126,8 @@ class ReturnBody {
     return {
       "width": width,
       "height": height,
-      "key": key
+      "key": key,
+      "mimeType": mimeType
     };
   }
 }

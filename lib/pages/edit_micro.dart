@@ -232,6 +232,7 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
   }
 
   void _submit(fn, medias, uid, initUserData)async{
+    FocusScope.of(context).unfocus();
     String token = await Micro.getToken('');
     setState(() {
       uploading = true;
@@ -374,7 +375,7 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
           :Container(),
           uploading == true
           ?Center(
-            child: Text('${progress * 100.round()}%', style: const TextStyle(color: Colors.grey),)
+            child: Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.grey),)
           )
           :Container(),
           uploading == true

@@ -11,18 +11,45 @@ class CommonUtils {
     return colors[random.nextInt(4)]!;
   }
 
-  static Future<void> deleteLocalFilesAsync(List<String> localURLs) async {
-    for (String localURL in localURLs) {
+  static Future<void> deleteLocalFilesAsync(List<String> localURLs, {bool hasVideo = false}) async {
+    if(hasVideo){
+      String pic = localURLs[0];
+      String video = localURLs[1];
       try {
-        final file = File(localURL);
-        if (await file.exists()) {
+        if (await isFileExist(pic)) {
+          final file = await getLocalFileForResource(pic);
           await file.delete();
-          debugPrint('已删除本地文件: $localURL');
+          debugPrint('已删除本地文件: $pic');
         } else {
-          debugPrint('本地文件不存在: $localURL');
+          debugPrint('本地文件不存在: $pic');
         }
       } catch (e) {
         debugPrint('删除本地文件时发生错误: $e');
+      }
+      try {
+        if (await isFileExist(video, isImg: false)) {
+          final file = await getLocalFileForResource(pic, isImg: false);
+          await file.delete();
+          debugPrint('已删除本地文件: $video');
+        } else {
+          debugPrint('本地文件不存在: $video');
+        }
+      } catch (e) {
+        debugPrint('删除本地文件时发生错误: $e');
+      }
+    } else {
+      for (String localURL in localURLs) {
+        try {
+          if (await isFileExist(localURL)) {
+            final file = await getLocalFileForResource(localURL);
+            await file.delete();
+            debugPrint('已删除本地文件: $localURL');
+          } else {
+            debugPrint('本地文件不存在: $localURL');
+          }
+        } catch (e) {
+          debugPrint('删除本地文件时发生错误: $e');
+        }
       }
     }
   }
@@ -84,31 +111,42 @@ class CommonUtils {
   }
 
   // 获取本地文件路径（基于资源 ID）
-  static Future<String> getLocalURLForResource(String resourceId) async {
+  static Future<String> getLocalURLForResource(String resourceId, {bool isImg = true}) async {
     // 获取应用的本地缓存目录
     final dir = await getApplicationDocumentsDirectory();
+    String filename = '';
     // 使用资源 ID 作为文件名
-    //final filename = '$resourceId.jpeg';  // 你可以根据需要修改文件扩展名
-    return p.join(dir.path, resourceId);  // 拼接文件路径
+    if(isImg){
+      filename = '$resourceId.jpeg'; 
+    } else {
+      filename = '$resourceId.mp4';
+    }
+   
+    return p.join(dir.path, filename);  // 拼接文件路径
   }
 
   // 获取本地文件路径（基于资源 ID）
-  static Future<File> getLocalFileForResource(String resourceId) async {
+  static Future<File> getLocalFileForResource(String resourceId, {bool isImg = true}) async {
     // 获取应用的本地缓存目录
+    String filename = '';
     final dir = await getApplicationDocumentsDirectory();
     // 使用资源 ID 作为文件名
-    //final filename = '$resourceId.jpeg';  // 你可以根据需要修改文件扩展名
-    return File(p.join(dir.path, resourceId));  // 拼接文件路径
+    if(isImg){
+      filename = '$resourceId.jpeg'; 
+    } else {
+      filename = '$resourceId.mp4';
+    }
+     // 你可以根据需要修改文件扩展名
+    return File(p.join(dir.path, filename));  // 拼接文件路径
   }
 
   // 检查本地是否已存在该资源文件
-  static Future<bool> isFileExist(String resourceId) async {
-    final file = await getLocalFileForResource(resourceId);
+  static Future<bool> isFileExist(String resourceId, {bool isImg = true}) async {
+    final file = await getLocalFileForResource(resourceId, isImg: isImg);
     return await file.exists();  // 判断文件是否存在
   }
 
   static String removeBaseUrl(String url) {
-    // 检查 URL 是否以 "http://nextsticker.xyz/" 开头，并去除它
     const baseUrl = 'http://nextsticker.xyz/';
     if (url.startsWith(baseUrl)) {
       return url.substring(baseUrl.length);  // 去掉前缀部分

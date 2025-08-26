@@ -167,7 +167,6 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
     }else{
       final ImagePicker picker = ImagePicker();
       final XFile video1 = await (picker.pickVideo(source: ImageSource.gallery)) as XFile;
-      debugPrint(video1.path);
       res.add(video1);
     } 
     if(res.isNotEmpty){
@@ -185,18 +184,6 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         imageFormat: ImageFormat.JPEG,
         quality: 25,
       );
-      // if (uint8list == null) {
-      //   throw Exception("生成缩略图失败");
-      // }
-      // final thumbPath = p.setExtension(res[0].path, ".jpeg");
-      // final file = File(thumbPath);
-      // await file.writeAsBytes(uint8list);
-      // final exists = await file.exists();
-      // if (!exists) {
-      //   throw Exception("缩略图写入失败: $thumbPath");
-      // } else {
-      //   debugPrint('缩略图已保存: $thumbPath');
-      // }
       setState(() {
         medias = res;
         picData = uint8list;
@@ -242,6 +229,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
   }
 
   void _submit(fn, uid, initUserData)async{
+    FocusScope.of(context).unfocus();
     String token = await Micro.getToken('3');
     setState(() {
       uploading = true;
@@ -352,7 +340,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
           :Container(),
           uploading == true
           ?Center(
-            child: Text('$progress%', style: const TextStyle(color: Colors.grey),)
+            child: Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.grey),)
           )
           :Container(),
           uploading == true

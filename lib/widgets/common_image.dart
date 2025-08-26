@@ -27,8 +27,7 @@ class ImageWithFallback extends StatefulWidget {
 }
 
 class ImageWithFallbackState extends State<ImageWithFallback> {
-  bool fileExists = false;
-
+  String localFileURL = '';
   @override
   void initState() {
     super.initState();
@@ -36,18 +35,18 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
   }
 
   Future<void> _checkFile(remoteURL, resourceId, name) async {
-    //final file = File(resourceId);
-    final exists = await CommonUtils.isFileExist(resourceId);
-    if (!exists) {
-      // 异步下载图片保存到本地
+    bool isExists = await CommonUtils.isFileExist(resourceId);
+    String localFileURL111 = '';
+    if (!isExists) {
       _downloadImage(remoteURL, await CommonUtils.getLocalURLForResource(resourceId));
       debugPrint('$name的图片不存在，开始下载...');
     } else{
+      localFileURL111 = await CommonUtils.getLocalURLForResource(resourceId);     
       debugPrint('$name使用本地图片');
     }
     if (mounted) {
       setState(() {
-        fileExists = exists;
+        localFileURL = localFileURL111;
       });
     }
   }
@@ -63,7 +62,7 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
       await file.writeAsBytes(response.data!);
       if (mounted) {
         setState(() {
-          fileExists = true;
+           localFileURL = file.path;
         });
       }
     } catch (e) {
@@ -74,14 +73,13 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
   @override
   Widget build(BuildContext context) {
     final double height = widget.width * widget.picHeight / widget.picWidth;
-
     return Container(
       decoration: const BoxDecoration(color: Colors.transparent),
       width: widget.width,
       height: height,
-      child: fileExists
+      child: localFileURL != ''
       ? Image.file(
-          File(widget.resourceId),
+          File(localFileURL),
           fit: BoxFit.cover,
         )
       : CachedNetworkImage(

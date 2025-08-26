@@ -53,33 +53,38 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
   final FocusNode _focus = FocusNode();
   String content = '';
 
+  double progress = 0.0;
+
   @override
   void initState() {
     super.initState();
     _focus.addListener(_onFocusChange);
     item = widget.articleFromStoryPage;
-    _initVideo();
+    _initVideo(widget.articleFromStoryPage.articleType);
   }
 
-  Future<void> _initVideo() async {
-    final url = widget.articleFromStoryPage.videoURL == '' 
-      ? 'https://cdn.moji.com/websrc/video/video621.mp4' 
-      : widget.articleFromStoryPage.videoURL;
-    final resourceId = CommonUtils.removeBaseUrl(url);
-    if (await CommonUtils.isFileExist(resourceId)) {
-      File file = await CommonUtils.getLocalFileForResource(resourceId);
-      _controller = VideoPlayerController.file(file);
-      debugPrint('${widget.articleFromStoryPage.articleName}的本地视频存在，直接使用');
+  Future<void> _initVideo(type) async {
+    final url = widget.articleFromStoryPage.videoURL == '' ? 'https://cdn.moji.com/websrc/video/video621.mp4' : widget.articleFromStoryPage.videoURL;
+    if(type == 3){
+      final resourceId = CommonUtils.removeBaseUrl(url);
+      if (await CommonUtils.isFileExist(resourceId, isImg: false)) {
+        File file = await CommonUtils.getLocalFileForResource(resourceId, isImg: false);
+        _controller = VideoPlayerController.file(file);
+        debugPrint('${widget.articleFromStoryPage.articleName}的本地视频存在，直接使用');
+      } else {
+        _controller = VideoPlayerController.networkUrl(Uri.parse(url));
+        _downloadAndSave(url, await CommonUtils.getLocalURLForResource(resourceId, isImg: false));
+        debugPrint('${widget.articleFromStoryPage.articleName}不存在，后台下载');
+      }
+      await _controller.initialize();
+      setState(() {
+        isReady = true;
+      });
+      _controller.play();
+      _controller.setLooping(true);
     } else {
       _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-      _downloadAndSave(url, await CommonUtils.getLocalURLForResource(resourceId));
     }
-    await _controller.initialize();
-    setState(() {
-      isReady = true;
-    });
-    _controller.play();
-    _controller.setLooping(true);
   }
 
   void toBottom(){
@@ -100,6 +105,9 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
         onReceiveProgress: (received, total) {
           if (total != -1) {
             debugPrint("下载进度: ${(received / total * 100).toStringAsFixed(0)}%");
+            setState(() {
+              progress = received / total;
+            });
           }
         },
       );
@@ -231,8 +239,15 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
               aspectRatio: width / height,
               child: VideoPlayer(_controller),
             )
-            :const Center(
-              child: CircularProgressIndicator(),
+            :Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 10),
+                  Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.grey))
+                ], 
+              ),
             )
         );
     }
@@ -255,10 +270,6 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
             picHeight: widget.articleFromStoryPage.height.toDouble(),
             name: widget.articleFromStoryPage.articleName
           )
-          // CachedNetworkImage(
-          //   imageUrl: imgs[0].key,
-          //   fit: BoxFit.cover
-          // ),
         );
     } else {
       return 
@@ -270,27 +281,22 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
           ),
           child: Swiper(
             itemBuilder: (BuildContext context,int index){
-                return
-                  Container(
-                    width: MediaQuery.of(context).size.width / 2,
-                    height: MediaQuery.of(context).size.height * height / width,
-                    decoration: BoxDecoration(
-                      color: randomColor(),
-                    ),
-                    child: 
-                    ImageWithFallback(
-                      remoteURL: imgs[index].key,
-                      resourceId: CommonUtils.removeBaseUrl(imgs[index].key),
-                      width: widget.articleFromStoryPage.width.toDouble(),
-                      picWidth: widget.articleFromStoryPage.width.toDouble(),
-                      picHeight: widget.articleFromStoryPage.height.toDouble(),
-                      name: widget.articleFromStoryPage.articleName
-                    )
-                    // CachedNetworkImage(
-                    //   imageUrl: imgs[index].key,
-                    //   fit: BoxFit.cover
-                    // ),
-                  );
+            return
+              Container(
+                width: MediaQuery.of(context).size.width / 2,
+                height: MediaQuery.of(context).size.height * height / width,
+                decoration: BoxDecoration(
+                  color: randomColor(),
+                ),
+                child: ImageWithFallback(
+                  remoteURL: imgs[index].key,
+                  resourceId: CommonUtils.removeBaseUrl(imgs[index].key),
+                  width: widget.articleFromStoryPage.width.toDouble(),
+                  picWidth: widget.articleFromStoryPage.width.toDouble(),
+                  picHeight: widget.articleFromStoryPage.height.toDouble(),
+                  name: widget.articleFromStoryPage.articleName
+                )
+              );
             },
             itemCount: imgs.length,
             pagination: const SwiperPagination(),
