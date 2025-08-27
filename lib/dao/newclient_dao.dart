@@ -2,15 +2,13 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 
-//const String urlBase = "https://nextsticker.cn/";
-//const String urlBase = "http://10.0.2.2:4000/";
-//const String urlBase = "http://localhost:4000/";
-const String urlBase = "http://172.20.10.13:4000/";
+bool developmentMode = true;
+String urlBase = developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
 
-const url = '${urlBase}api/users/newClient';
-const loginUrl = '${urlBase}api/users/login';
-const tokenUrl = '${urlBase}api/trip/getUploadToken';
-const registerUrl = '${urlBase}api/users';
+String url = '${urlBase}api/users/newClient';
+String loginUrl = '${urlBase}api/users/login';
+String tokenUrl = '${urlBase}api/trip/getUploadToken';
+String registerUrl = '${urlBase}api/users';
 
 class ClientDao{
   static Future create(data) async{

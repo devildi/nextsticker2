@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:math';
 import 'package:nextsticker2/pages/diy.dart';
 import 'package:nextsticker2/tools/drag.dart';
 import 'package:nextsticker2/tools/pop.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
 class Tool extends StatefulWidget {
   final dynamic platform;
@@ -31,7 +31,7 @@ class ToolState extends State<Tool> {
     return GestureDetector(
       child: ClipOval(
         child: Container(
-          color: randomColor(),
+          color: CommonUtils.randomColor(),
           width: 65,
           height: 65,
           child: const Center(child: Text('DIY',style: TextStyle(fontSize: 15.0,color: Colors.black)))
@@ -53,7 +53,7 @@ class ToolState extends State<Tool> {
     return GestureDetector(
       child: ClipOval(
         child: Container(
-          color: randomColor(),
+          color: CommonUtils.randomColor(),
           width: 65,
           height: 65,
           child: const Center(child: Text('Pop',style: TextStyle(fontSize: 15.0,color: Colors.black)))
@@ -73,7 +73,7 @@ class ToolState extends State<Tool> {
     return GestureDetector(
       child: ClipOval(
         child: Container(
-          color: randomColor(),
+          color: CommonUtils.randomColor(),
           width: 65,
           height: 65,
           child: const Center(child: Text('Drag',style: TextStyle(fontSize: 15.0,color: Colors.black)))
@@ -118,10 +118,4 @@ class ToolState extends State<Tool> {
       ),
     );
   }
-}
-
-Color randomColor(){
-  List colors = [Colors.red[100], Colors.green[100], Colors.yellow[100], Colors.orange[100]];
-  Random random = Random();
-  return colors[random.nextInt(4)];
 }

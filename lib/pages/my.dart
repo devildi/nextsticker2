@@ -57,21 +57,6 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
     super.dispose();
   }
 
-  // void _submit(){
-  //   Navigator.pushNamed(context, "registor", arguments: widget.openSnackBar);
-
-  // }
-  
-  // void _jumpToToolPage(){
-  //   if(widget.auth.name == 'wudi'){
-  //     Navigator.push(context, MaterialPageRoute(
-  //       builder: (context) => Tool(
-  //         platform: widget.platform
-  //       )
-  //     ));
-  //   }
-  // }
-
   void _jumpToToolPage(){
     Navigator.push(context, MaterialPageRoute(
       builder: (context) => Diy(

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:math';
 import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
 import 'package:nextsticker2/dao/travel_dao.dart';
@@ -491,10 +490,4 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
       ): null
     );
   }
-}
-
-Color randomColor(){
-  List colors = [Colors.red[100], Colors.green[100], Colors.yellow[100], Colors.orange[100]];
-  Random random = Random();
-  return colors[random.nextInt(4)];
 }

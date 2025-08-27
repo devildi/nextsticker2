@@ -5,8 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:socket_io_client/socket_io_client.dart' as io;
 import 'dart:convert';
-//import 'dart:io';
-//import 'package:flutter/foundation.dart';
 import 'package:nextsticker2/store/store.dart';
 import 'package:nextsticker2/dao/travel_dao.dart';
 import 'package:nextsticker2/dao/story_dao.dart';
@@ -31,9 +29,6 @@ import 'package:nextsticker2/widgets/drawer.dart';
 import 'package:nextsticker2/widgets/fab.dart';
 import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
-//import 'package:image_picker/image_picker.dart';
-//import "package:images_picker/images_picker.dart";
-//import 'package:nextsticker2/dao/newclient_dao.dart';
 //websocket请求格式：'http://localhost:4000/socket.io/?EIO=4&transport=polling&t=OIUQBge'
 //const wsURL = 'ws://localhost:4000';
 const wsURL = 'wss://nextsticker.cn';
@@ -580,16 +575,6 @@ class _MyHomePageState extends State<MyHomePage> {
       Provider.of<UserData>(context, listen: false).setLoading(true);
       _controller1.text = item.nameOfScence;
       _controller2.text = '';
-      //_controller3.text = '';
-      // TravelDao.getBing(item.nameOfScence).then((value){
-      //     debugPrint(value.bingUrl);
-      //     Provider.of<UserData>(context, listen: false).setPicBing(value.bingUrl);
-      //   } 
-      // );
-      // TravelDao.getDes(item.nameOfScence).then((value){
-      //     _controller2.text = value.bingUrl;
-      //   } 
-      // );
       tasks.add(TravelDao.getBing(item.nameOfScence));
       tasks.add(TravelDao.getDes(item.nameOfScence));
       Future.wait(tasks).then((value){
@@ -604,117 +589,6 @@ class _MyHomePageState extends State<MyHomePage> {
       _controller2.text = tripItem.des;
       //_controller3.text = tripItem.picURL;
     }
-
-    // Future startUploadToQiniu(token, path) async{
-    //   putController = PutController();
-    //   putController.addSendProgressListener((double percent) {
-    //     debugPrint('已上传进度变化：已发送：$percent');
-    //   });
-    //   debugPrint('添加任务进度订阅');
-    //   putController.addProgressListener((double percent) {
-    //     setState(() {
-    //       progress = percent;
-    //     });
-    //     debugPrint('任务进度变化：已发送：$percent');
-    //   });
-    //   debugPrint('添加状态订阅');
-    //   putController.addStatusListener((StorageStatus status) {
-    //     debugPrint('状态变化: 当前任务状态：$status');
-    //   });
-    //   debugPrint('开始上传文件');
-    //   final putOptions = PutOptions(
-    //     controller: putController
-    //   );
-    //   Future<PutResponse> upload;
-    //   upload = storage.putFile(
-    //     File(path),
-    //     token,
-    //     options: putOptions,
-    //   );
-    //   try{
-    //     PutResponse response = await upload;
-    //     debugPrint('上传已完成: 原始响应数据: ${ReturnBody.fromJson(response.rawData)}');
-    //     debugPrint('------------------------');
-    //     ReturnBody body = ReturnBody.fromJson(response.rawData);
-    //     return body;
-    //   } catch(error){
-    //     if (error is StorageError) {
-    //       switch (error.type) {
-    //         case StorageErrorType.CONNECT_TIMEOUT:
-    //           debugPrint('发生错误: 连接超时');
-    //           break;
-    //         case StorageErrorType.SEND_TIMEOUT:
-    //           debugPrint('发生错误: 发送数据超时');
-    //           break;
-    //         case StorageErrorType.RECEIVE_TIMEOUT:
-    //           debugPrint('发生错误: 响应数据超时');
-    //           break;
-    //         case StorageErrorType.RESPONSE:
-    //           debugPrint('发生错误: ${error.message}');
-    //           break;
-    //         case StorageErrorType.CANCEL:
-    //           debugPrint('发生错误: 请求取消');
-    //           break;
-    //         case StorageErrorType.UNKNOWN:
-    //           debugPrint('发生错误: 未知错误');
-    //           break;
-    //         case StorageErrorType.NO_AVAILABLE_HOST:
-    //           debugPrint('发生错误: 无可用 Host');
-    //           break;
-    //         case StorageErrorType.IN_PROGRESS:
-    //           debugPrint('发生错误: 已在队列中');
-    //           break;
-    //       }
-    //     } else {
-    //       debugPrint('发生错误: ${error.toString()}');
-    //     }
-    //     debugPrint('------------------------');
-    //   }
-    // }
-
-    // Future addPic() async {
-    //   List res;
-    //   if(defaultTargetPlatform == TargetPlatform.iOS){
-    //     res = await (ImagesPicker.pick(
-    //       count: 1,
-    //       pickType: PickType.image
-    //     )) as List<dynamic>;
-    //   } else {
-    //     final ImagePicker picker = ImagePicker();
-    //     res = await picker.pickMultiImage();
-    //   }
-    //   if(res.isNotEmpty){
-    //     if (!context.mounted) return;
-    //     Provider.of<UserData>(context, listen: false).setPicsFromAlbum(res);
-    //   }
-    // }
-
-    // void up()async{
-    //   List medias = Provider.of<UserData>(context, listen: false).picsFromAlbum;
-    //   try{
-    //     String token = await Micro.getToken('');
-    //     ReturnBody body = await startUploadToQiniu(token, medias[0].path);
-    //     _controller3.text = 'http://nextsticker.top/${body.key}';
-    //     setState(() {
-    //       uploading = false;
-    //     });
-    //   } catch(err){
-    //     debugPrint(err.toString());
-    //     setState(() {
-    //       uploading = false;
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //         const SnackBar(backgroundColor: Colors.red, content: Text('网络错误，请稍后再试！', textAlign: TextAlign.center)),
-    //       );
-    //     });
-    //   }
-    // }
-
-    // void upload() async{
-    //   setState(() {
-    //     uploading = true;
-    //     up();
-    //   });
-    // }
     
     void save(cat, location)async {
       if(tripItem.nameOfScence == ''){
@@ -799,240 +673,137 @@ class _MyHomePageState extends State<MyHomePage> {
             return PopScope(
               onPopInvoked: _pop,
               child: Dialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(15.0),
-              ),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      tripItem.picURL !='' || userData.picBing != '' 
-                      ?GestureDetector(
-                        onTap: fetchIMG,
-                        child: CachedNetworkImage(
-                          imageUrl: userData.picBing != '' ? userData.picBing : tripItem.picURL,
-                          fit: BoxFit.cover,
-                          height: 150,
-                          //placeholder: (context, url) => const CircularProgressIndicator(), // 加载中的占位符
-                          errorWidget: (context, url, error) => const Icon(Icons.error),
-                        ),
-                      )
-                      :Container(),
-                      const SizedBox(height: 20),
-                      index.isNotEmpty
-                      ?Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text('第${index[0] + 1}天第${index[1] + 1}个景点', style: const TextStyle(fontSize: 16)),
-                          // GestureDetector(
-                          //   onTap: () {
-                            
-                          //   },
-                          //   child: const Icon(Icons.close, color: Colors.red),
-                          // )
-                        ],
-                      )
-                      :Container(),
-                      const SizedBox(height: 20),
-                      TextField(
-                        controller: _controller1,
-                        decoration: const InputDecoration(
-                          labelText: '地点',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        controller: _controller2,
-                        maxLines: 3,
-                        decoration: const InputDecoration(
-                          labelText: '描述',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      userData.loading
-                      ?Align(
-                        alignment: Alignment.centerLeft, // 仅这个Text左对齐
-                        child: Row(
-                          children: [ const Text('图片链接和景点信息获取中'), anitext()],
-                        ),
-                      )
-                      :Container(),
-                      userData.loading
-                      ?const SizedBox(height: 12)
-                      :Container(),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          OutlinedButton(
-                            onPressed: () {
-                              userData.setCategory(0);
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: 0==userData.category ? Colors.blue : Colors.transparent,  // 背景颜色
-                              foregroundColor: 0==userData.category ?Colors.white : Colors.blue, // 文字颜色
-                              side: const BorderSide(color: Colors.blue), // 边框颜色
-                            ),
-                            child: const Text('景点'),
-                          ),
-                          OutlinedButton(
-                            onPressed: () {
-                              userData.setCategory(2);
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: 2==userData.category ? Colors.blue : Colors.transparent,  // 背景颜色
-                              foregroundColor: 2==userData.category ?Colors.white : Colors.blue, // 文字颜色
-                              side: const BorderSide(color: Colors.blue), // 边框颜色
-                            ),
-                            child: const Text('吃喝'),
-                          ),
-                          OutlinedButton(
-                            onPressed: () {
-                              userData.setCategory(1);
-                            },
-                            style: OutlinedButton.styleFrom(
-                              backgroundColor: 1==userData.category ? Colors.blue : Colors.transparent,  // 背景颜色
-                              foregroundColor: 1==userData.category ?Colors.white : Colors.blue, // 文字颜色
-                              side: const BorderSide(color: Colors.blue), // 边框颜色
-                            ),
-                            child: const Text('住宿'),
-                          )
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () { 
-                              Navigator.pop(context);
-                              Provider.of<UserData>(context, listen: false).setPicBing('');
-                              Provider.of<UserData>(context, listen: false).setDes('');
-                              Provider.of<UserData>(context, listen: false).setLoading(false);
-                            },
-                            child: Text('取消', style: TextStyle(color: Colors.blue[400])),
-                          ),
-                          const SizedBox(width: 8),
-                          TextButton(
-                            onPressed:
-                              userData.loading
-                              ?() => {}
-                              :() => save(userData.category, userData.index),
-                            child: tripItem.nameOfScence == '' 
-                              ? Text('添加至当日行程', style: TextStyle(
-                                  color: userData.loading ? Colors.grey: Colors.blue[400]
-                                ),) 
-                              : Text('保存修改', style: TextStyle(
-                                  color: userData.loading ? Colors.grey: Colors.blue[400]
-                                ),),
-                          ),
-                        ],
-                      ),
-                    ],
-                  )
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15.0),
                 ),
-              ),
-            )
-              // AlertDialog(
-              //   title: const Text('完善内容'),
-              //   content: StatefulBuilder(builder: (context, StateSetter setState) {           
-              //     return SingleChildScrollView(
-              //       child: ExpansionPanelList(
-              //         elevation: 0,
-              //         dividerColor: Colors.white,
-              //         expandedHeaderPadding: const EdgeInsets.all(0),
-              //         expansionCallback: (index, isExpanded) {
-              //           setState(() {
-              //             _modalIndex = index;
-              //           });
-              //         },
-              //         children: [
-              //           ExpansionPanel(
-              //             canTapOnHeader: true,
-              //             isExpanded: _modalIndex == 0,
-              //             body: TextField(
-              //               controller: _controller1,
-              //               decoration: const InputDecoration(
-              //                 labelText: '输入景点名字',
-              //               ),
-              //             ),
-              //             headerBuilder: (context, isExpanded) {
-              //               return ListTile(
-              //                 title: const Text('名字：'),
-              //                 onTap: (){
-              //                   setState(() {
-              //                     _modalIndex = 0;
-              //                   });
-              //                 },
-              //               );
-              //             },
-              //           ),
-              //           ExpansionPanel(
-              //             canTapOnHeader: true,
-              //             isExpanded: _modalIndex == 1,
-              //             body: TextField(
-              //               controller: _controller2,
-              //               maxLines: 5,
-              //               decoration: const InputDecoration(
-              //                 labelText: '输入描述',
-              //               ),
-              //             ),
-              //             headerBuilder: (context, isExpanded) {
-              //               return ListTile(
-              //                 title: const Text('描述：'),
-              //                 onTap: (){
-              //                   setState(() {
-              //                     _modalIndex = 1;
-              //                   });
-              //                 },
-              //               );
-              //             },
-              //           ),
-              //           ExpansionPanel(
-              //             canTapOnHeader: true,
-              //             isExpanded: _modalIndex == 2,
-              //             body: TextField(
-              //               controller: _controller3,
-              //               maxLines: 3,
-              //               decoration: const InputDecoration(
-              //                 labelText: '输入图片链接',
-              //               ),
-              //             ),
-              //             headerBuilder: (context, isExpanded) {
-              //               return ListTile(
-              //                 title: const Text('图片链接：'),
-              //                 onTap: (){
-              //                   setState(() {
-              //                     _modalIndex = 2;
-              //                   });
-              //                 },
-              //               );
-              //             },
-              //           ),
-              //         ],
-              //       ),
-              //     );
-              //   }),
-              //   actions: 
-              //   [
-              //     Provider.of<UserData>(context).picsFromAlbum.isEmpty
-              //     ?TextButton(
-              //       onPressed: addPic,
-              //       child: const Text('选择图片'),
-              //     )
-              //     :TextButton(
-              //       onPressed: upload,
-              //       child: const Text('上传图片'),
-              //     ),
-              //     TextButton(
-              //       onPressed: save,
-              //       child: tripItem.nameOfScence == '' ? const Text('添加至当日行程') : const Text('保存修改'),
-              //     )
-              //   ]         
-              // )
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        tripItem.picURL !='' || userData.picBing != '' 
+                        ?GestureDetector(
+                          onTap: fetchIMG,
+                          child: CachedNetworkImage(
+                            imageUrl: userData.picBing != '' ? userData.picBing : tripItem.picURL,
+                            fit: BoxFit.cover,
+                            height: 150,
+                            //placeholder: (context, url) => const CircularProgressIndicator(), // 加载中的占位符
+                            errorWidget: (context, url, error) => const Icon(Icons.error),
+                          ),
+                        )
+                        :Container(),
+                        const SizedBox(height: 20),
+                        index.isNotEmpty
+                        ?Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text('第${index[0] + 1}天第${index[1] + 1}个景点', style: const TextStyle(fontSize: 16)),
+                          ],
+                        )
+                        :Container(),
+                        const SizedBox(height: 20),
+                        TextField(
+                          controller: _controller1,
+                          decoration: const InputDecoration(
+                            labelText: '地点',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _controller2,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: '描述',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        userData.loading
+                        ?Align(
+                          alignment: Alignment.centerLeft, // 仅这个Text左对齐
+                          child: Row(
+                            children: [ const Text('图片链接和景点信息获取中'), anitext()],
+                          ),
+                        )
+                        :Container(),
+                        userData.loading
+                        ?const SizedBox(height: 12)
+                        :Container(),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            OutlinedButton(
+                              onPressed: () {
+                                userData.setCategory(0);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: 0==userData.category ? Colors.blue : Colors.transparent,  // 背景颜色
+                                foregroundColor: 0==userData.category ?Colors.white : Colors.blue, // 文字颜色
+                                side: const BorderSide(color: Colors.blue), // 边框颜色
+                              ),
+                              child: const Text('景点'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () {
+                                userData.setCategory(2);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: 2==userData.category ? Colors.blue : Colors.transparent,  // 背景颜色
+                                foregroundColor: 2==userData.category ?Colors.white : Colors.blue, // 文字颜色
+                                side: const BorderSide(color: Colors.blue), // 边框颜色
+                              ),
+                              child: const Text('吃喝'),
+                            ),
+                            OutlinedButton(
+                              onPressed: () {
+                                userData.setCategory(1);
+                              },
+                              style: OutlinedButton.styleFrom(
+                                backgroundColor: 1==userData.category ? Colors.blue : Colors.transparent,  // 背景颜色
+                                foregroundColor: 1==userData.category ?Colors.white : Colors.blue, // 文字颜色
+                                side: const BorderSide(color: Colors.blue), // 边框颜色
+                              ),
+                              child: const Text('住宿'),
+                            )
+                          ],
+                        ),
+                        const SizedBox(height: 24),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            TextButton(
+                              onPressed: () { 
+                                Navigator.pop(context);
+                                Provider.of<UserData>(context, listen: false).setPicBing('');
+                                Provider.of<UserData>(context, listen: false).setDes('');
+                                Provider.of<UserData>(context, listen: false).setLoading(false);
+                              },
+                              child: Text('取消', style: TextStyle(color: Colors.blue[400])),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton(
+                              onPressed:
+                                userData.loading
+                                ?() => {}
+                                :() => save(userData.category, userData.index),
+                              child: tripItem.nameOfScence == '' 
+                                ? Text('添加至当日行程', style: TextStyle(
+                                    color: userData.loading ? Colors.grey: Colors.blue[400]
+                                  ),) 
+                                : Text('保存修改', style: TextStyle(
+                                    color: userData.loading ? Colors.grey: Colors.blue[400]
+                                  ),),
+                            ),
+                          ],
+                        ),
+                      ],
+                    )
+                  ),
+                ),
+              )
             );
           }
         )

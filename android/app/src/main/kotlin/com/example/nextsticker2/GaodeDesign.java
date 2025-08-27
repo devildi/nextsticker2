@@ -185,7 +185,7 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
                 double longitude = Double.parseDouble(jsonNode.get("longitude").asText());
                 String des = jsonNode.get("des").asText();
                 imageUrl = jsonNode.get("picURL").asText();
-                Log.e("pointURL",imageUrl);
+                //Log.e("pointURL",imageUrl);
                 LatLng latLng = new LatLng(latitude,longitude);
                 MarkerOptions markerOptions = new MarkerOptions();
                 markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.location));

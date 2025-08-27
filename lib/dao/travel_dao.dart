@@ -3,21 +3,19 @@ import 'package:dio/dio.dart';
 import 'dart:convert'; 
 import 'package:nextsticker2/model/travel_model.dart';
 
-//const String urlBase = "https://nextsticker.cn/";
-//const String urlBase = "http://10.0.2.2:4000/";
-//const String urlBase = "http://localhost:4000/";
-const String urlBase = "http://172.20.10.13:4000/";
+bool developmentMode = true;
+String urlBase = developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
 
-const urL = '${urlBase}api/trip/get?uid=';
-const urLForAllTrip = '${urlBase}api/trip/getAllTrip?';
-const urLForDescriptedTrip = '${urlBase}api/trip/getDescriptedTrip?';
-const saveURL = '${urlBase}api/trip/new';
-const getBingPic = '${urlBase}api/trip/getBingImg?';
-const getLocationUrl = '${urlBase}api/trip/getLocation?';
-const getDesURL = '${urlBase}api/chat/getDes?';
-const getInfosURL = '${urlBase}api/chat/getInfos?';
-const formatTripUrl = '${urlBase}api/chat/formatTripFromLLM?';
-const deleteTripUrl = '${urlBase}api/trip/deleteTrip';
+String urL = '${urlBase}api/trip/get?uid=';
+String urLForAllTrip = '${urlBase}api/trip/getAllTrip?';
+String urLForDescriptedTrip = '${urlBase}api/trip/getDescriptedTrip?';
+String saveURL = '${urlBase}api/trip/new';
+String getBingPic = '${urlBase}api/trip/getBingImg?';
+String getLocationUrl = '${urlBase}api/trip/getLocation?';
+String getDesURL = '${urlBase}api/chat/getDes?';
+String getInfosURL = '${urlBase}api/chat/getInfos?';
+String formatTripUrl = '${urlBase}api/chat/formatTripFromLLM?';
+String deleteTripUrl = '${urlBase}api/trip/deleteTrip';
 
 class TravelDao{
   static Future<ReturnInfos> getInfos(str) async{

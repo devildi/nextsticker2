@@ -4,7 +4,6 @@ import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:nextsticker2/widgets/webview.dart';
 import 'package:nextsticker2/pages/micro_detail.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'dart:math';
 import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
 import 'package:nextsticker2/widgets/animate_edit.dart';
@@ -228,12 +227,6 @@ class StoryState extends State<Story> {
   }
 }
 
-Color randomColor(){
-  List colors = [Colors.red[100], Colors.green[100], Colors.yellow[100], Colors.orange[100]];
-  Random random = Random();
-  return colors[random.nextInt(4)];
-}
-
 bool likeOrNot(array, uid){
   bool result = false;
   array.forEach((row){
@@ -348,7 +341,7 @@ class _Item extends StatelessWidget {
               children: <Widget>[
                 Container( 
                   decoration: BoxDecoration(
-                    color: randomColor(),
+                    color: CommonUtils.randomColor(),
                   ),
                   width: MediaQuery.of(context).size.width / 2,
                   height: (MediaQuery.of(context).size.width / 2) * storys[index].height / storys[index].width,

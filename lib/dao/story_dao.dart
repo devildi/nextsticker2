@@ -2,19 +2,17 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:nextsticker2/model/article_model.dart';
 
-//const String urlBase = "https://nextsticker.cn/";
-//const String urlBase = "http://10.0.2.2:4000/";
-//const String urlBase = "http://localhost:4000/";
-const String urlBase = "http://172.20.10.13:4000/";
+bool developmentMode = true;
+String urlBase = developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
 
-const urL = '${urlBase}api/trip/getAllStory?page=';
-const poMicroURL = '${urlBase}api/trip/newItem';
-const clickLikeURL = '${urlBase}api/trip/clickLike';
-const getStory = '${urlBase}api/trip/getStoryById?_id=';
-const poCommentURL = '${urlBase}api/trip/poComment';
-const fetchByAuthorURL = '${urlBase}api/trip/getStoryByAuthor?page=';
-const likeOrCollectURL = '${urlBase}api/trip/getLikeOrCollectStoryByAuthor?page=';
-const deleteURL = '${urlBase}api/trip/deleteStoryById';
+String urL = '${urlBase}api/trip/getAllStory?page=';
+String poMicroURL = '${urlBase}api/trip/newItem';
+String clickLikeURL = '${urlBase}api/trip/clickLike';
+String getStory = '${urlBase}api/trip/getStoryById?_id=';
+String poCommentURL = '${urlBase}api/trip/poComment';
+String fetchByAuthorURL = '${urlBase}api/trip/getStoryByAuthor?page=';
+String likeOrCollectURL = '${urlBase}api/trip/getLikeOrCollectStoryByAuthor?page=';
+String deleteURL = '${urlBase}api/trip/deleteStoryById';
 
 class StoryDao{
   static Future<AllStoryModel> fetch(index) async{
