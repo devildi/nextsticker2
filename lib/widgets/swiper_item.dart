@@ -72,12 +72,14 @@ class DetailCardState extends State<DetailCard>{
                 style: const TextStyle(fontSize: 15),
               ),
               const SizedBox(height: 16),
-              Positioned.fill(
+              widget.trip.picURL.isNotEmpty
+              ?Positioned.fill(
                 child: CachedNetworkImage(
                   imageUrl: widget.trip.picURL,
                   fit: BoxFit.cover,
                 ),
-              ),
+              )
+              :Container(),
               const SizedBox(height: 16),
               TextField(
                 controller: _descriptionController,

@@ -17,7 +17,10 @@ class Detail extends StatelessWidget {
     //print(array[0].dayList[0].picURL);
     final List fixedList = Iterable<int>.generate(array.length).toList();
     List <Widget>dataArray = [];
-    dataArray.add(photo(context, passData.cover != '' ? passData.cover : array[0].dayList[0].picURL, passData));
+    if(array[0].dayList[0].picURL != '' || array[0].dayList[0].picURL.isNotEmpty){
+      dataArray.add(photo(context, passData.cover != '' ? passData.cover : array[0].dayList[0].picURL, passData));
+    }
+    
     fixedList.asMap().forEach((i, item){
       List <Widget>sunArray = [];
       array[i].dayList.asMap().forEach((index1, j){

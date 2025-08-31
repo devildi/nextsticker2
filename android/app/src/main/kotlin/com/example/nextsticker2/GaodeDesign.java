@@ -64,6 +64,8 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
     private MethodChannel.Result pendingResult;
     private Marker marker;
 
+    boolean flag;
+
     GaodeDesign(Context context, BinaryMessenger messenger, int id, Map<String, Object> creationParams, Activity activity) {
         MapsInitializer.updatePrivacyShow(context,true,true);
         MapsInitializer.updatePrivacyAgree(context,true);
@@ -75,7 +77,11 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
         context1 = context;
         activity1 = activity;
         String pointString = creationParams.get("pointsString").toString();
-
+        if (pointString.trim().isEmpty()) {
+            flag = true;
+        }else {
+            flag = false;
+        }
         if(mapView != null){
             mapView.onResume();
         }
@@ -109,15 +115,24 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
         });
         AMap.OnInfoWindowClickListener listener = arg0 -> {
             ObjectMapper objectMapper = new ObjectMapper();
-            Log.e("map",marker.getTitle());
+            Log.e("map",marker.getSnippet());
             ObjectNode jsonNode = objectMapper.createObjectNode();
             jsonNode.put("nameOfScence", marker.getTitle());
             jsonNode.put("longitude", marker.getPosition().longitude);
             jsonNode.put("latitude", marker.getPosition().latitude);
-            try {
-                methodChannel.invokeMethod("openModal",objectMapper.writeValueAsString(jsonNode));
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
+            String des = marker.getSnippet();
+            if (des == null || des.trim().isEmpty()) {
+                try {
+                    methodChannel.invokeMethod("addToDayList",objectMapper.writeValueAsString(jsonNode));
+                } catch (JsonProcessingException e) {
+                    e.printStackTrace();
+                }
+            } else {
+                try {
+                    methodChannel.invokeMethod("openModal",objectMapper.writeValueAsString(jsonNode));
+                } catch (JsonProcessingException e) {
+                    e.printStackTrace();
+                }
             }
             marker.hideInfoWindow();
         };

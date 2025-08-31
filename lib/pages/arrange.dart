@@ -83,9 +83,11 @@ class ArrangeState extends State<Arrange> {
         );
       } else {
         return InputChip(
-          avatar: CircleAvatar(
-            backgroundImage: NetworkImage(item.picURL),
-          ),
+          avatar: (item.picURL.isNotEmpty || item.picURL != '')
+          ? CircleAvatar(
+              backgroundImage: NetworkImage(item.picURL),
+            )
+          : null,
           label: Text(item.nameOfScence),
           deleteIcon: Container(
             decoration: const BoxDecoration(

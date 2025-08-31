@@ -365,10 +365,12 @@ class GaodeMapState extends State<GaodeMap> with AutomaticKeepAliveClientMixin
                           ),
                         ),
                         const SizedBox(width: 10),
-                        CircleAvatar(
+                        pointsArray[currentIndex].picURL != '' || pointsArray[currentIndex].picURL.isNotEmpty
+                        ?CircleAvatar(
                           radius: 20,
                           backgroundImage: NetworkImage(pointsArray[currentIndex].picURL), 
-                        ),
+                        )
+                        :Container(),
                         const SizedBox(width: 10),
                         Text(
                           pointsArray[currentIndex].nameOfScence,

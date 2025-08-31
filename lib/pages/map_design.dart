@@ -96,9 +96,11 @@ class MapDesignState extends State<MapDesign> {
   }
 
   void _reset(){
-    Provider.of<UserData>(context, listen: false).setCloneData(widget.tripData.copy());
-    //widget.platform.invokeMethod('InjectOnePoint',widget.tripData.copy().detail[index[0]].dayList[index[1]].toJson().toString());
-    fedback('已恢复初始数据！');
+    if(widget.tripData.tripName != ''){
+      Provider.of<UserData>(context, listen: false).setCloneData(widget.tripData.copy());
+      //widget.platform.invokeMethod('InjectOnePoint',widget.tripData.copy().detail[index[0]].dayList[index[1]].toJson().toString());
+      fedback('已恢复初始数据！');
+    }
   }
 
   void fedback(str){

@@ -326,10 +326,6 @@ class _MyHomePageState extends State<MyHomePage> {
         case 'alert':
           _openAlert(context);
           break;
-        case 'getPoster':
-          //dynamic content = await call.arguments;
-          //print(content);
-          break;
         case 'clearInfor':
           Provider.of<UserData>(context, listen: false).setTrafficInfo([]);
           break;
@@ -344,6 +340,12 @@ class _MyHomePageState extends State<MyHomePage> {
           dynamic obj = json.decode(content);
           DetailModel item = DetailModel.fromJson(obj);
           _show(item);
+          break;
+        case 'addToDayList':
+          String content = await call.arguments;
+          dynamic obj = json.decode(content);
+          DetailModel item = DetailModel.fromJson(obj);
+          _addToDayList(item);
           break;
         case 'findPOIResults':
           String content = await call.arguments;
@@ -446,7 +448,8 @@ class _MyHomePageState extends State<MyHomePage> {
             //mainAxisSize: MainAxisSize.min,
             //crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ClipRRect(
+              points[0].picURL.isNotEmpty
+              ?ClipRRect(
                 borderRadius: const BorderRadius.only(
                   topLeft: Radius.circular(20.0),
                   topRight: Radius.circular(20.0),
@@ -457,7 +460,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   fit: BoxFit.cover,
                   fadeInDuration: const Duration(),
                 ),
-              ),
+              )
+              :Container(),
               Padding(
                 padding: const EdgeInsets.all(3.0),
                 child: Column(
@@ -467,23 +471,11 @@ class _MyHomePageState extends State<MyHomePage> {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(points[0].nameOfScence, style: const TextStyle(fontSize: 25.0)),
-                        // FlatButton(
-                        //   onPressed: (){
-                        //     userData.detail.forEach((value){
-                        //       value.dayList.forEach((i){
-                        //         if(i.nameOfScence == string){
-                        //           print(i.done);
-                        //           i.done = !i.done;
-                        //         }
-                        //       }); 
-                        //     });
-                        //     Provider.of<UserData>(context, listen: false).setUserData(userData);
-                        //   },
-                        //   child: Text(points[0].done ? '取消打卡' : '打卡', style: TextStyle(fontSize: 20.0)),
-                        // )
                       ],
                     ),
-                    Text(points[0].des, style: const TextStyle(fontSize: 15.0))
+                    points[0].des.isNotEmpty
+                    ?Text(points[0].des, style: const TextStyle(fontSize: 15.0))
+                    :Container()
                   ],
                 ),
               ),
@@ -558,6 +550,38 @@ class _MyHomePageState extends State<MyHomePage> {
     return newArray;
   }
 
+  _addToDayList(DetailModel item){
+    TravelModel cloneTrip = Provider.of<UserData>(context, listen: false).cloneData;
+    item.category = 0;
+    List indexAndCloneTripItem = indexAndTripItem(cloneTrip, item.nameOfScence);
+    List index = indexAndCloneTripItem[1];
+    if(index.isNotEmpty){
+      debugPrint('存在重复的点${item.nameOfScence}：在第${index[0] + 1}天第${index[1] + 1}个');
+      _openSnackBar('已存在该点：在第${index[0] + 1}天第${index[1] + 1}个', 2);
+      Provider.of<UserData>(context, listen: false).setPoints([]);
+      platform.invokeMethod('clear');
+      return;
+    }
+    List location = Provider.of<UserData>(context, listen: false).index;
+    if(location.isEmpty){
+      location = [0, 0];
+    }
+    try{
+      cloneTrip.detail[location[0]].dayList.add(item);
+      if (!context.mounted) return;
+      Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
+      Provider.of<UserData>(context, listen: false).setPoints([]);
+      platform.invokeMethod('clear');
+      _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[1]].dayList.length}个点', 1);
+    }catch(err){
+      debugPrint(err.toString());
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(backgroundColor: Colors.red, content: Text('添加点出错，请稍后再试！', textAlign: TextAlign.center)),
+      );
+    }
+  }
+
   Future<void> _show(DetailModel item) async {
     TravelModel cloneTrip = Provider.of<UserData>(context, listen: false).cloneData;
     //List location = Provider.of<UserData>(context, listen: false).index;
@@ -584,6 +608,20 @@ class _MyHomePageState extends State<MyHomePage> {
           Provider.of<UserData>(context, listen: false).setLoading(false);
           tasks.clear();
       });
+      // try{
+      //   cloneTrip.detail[location[0]].dayList.add(item);
+      //   if (!context.mounted) return;
+      //   Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
+      //   Provider.of<UserData>(context, listen: false).setPoints([]);
+      //   platform.invokeMethod('clear');
+      //   _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[1]].dayList.length}个点', 1);
+      // }catch(err){
+      //   debugPrint(err.toString());
+      //   if (!context.mounted) return;
+      //   ScaffoldMessenger.of(context).showSnackBar(
+      //     const SnackBar(backgroundColor: Colors.red, content: Text('添加点出错，请稍后再试！', textAlign: TextAlign.center)),
+      //   );
+      // }
     } else {
       _controller1.text = tripItem.nameOfScence;
       _controller2.text = tripItem.des;

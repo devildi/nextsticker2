@@ -8,6 +8,7 @@ import 'package:nextsticker2/pages/arrange.dart';
 import 'package:flutter_swiper_null_safety/flutter_swiper_null_safety.dart';
 import 'package:nextsticker2/widgets/swiper_item.dart';
 import 'package:flutter/services.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
 class MyList extends StatefulWidget {
   final List trips;
@@ -191,17 +192,17 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
         TravelModel trip = await TravelDao.fromLLM(textController.text);
         for (var i = 0; i < trip.detail.length; i++){
           for (var j = 0; j < trip.detail[i].dayList.length; j++){
-            BingCover newUrl = await TravelDao.getBing(trip.detail[i].dayList[j].nameOfScence);
+            // BingCover newUrl = await TravelDao.getBing(trip.detail[i].dayList[j].nameOfScence);
             // BingCover location = await TravelDao.getLocation(trip.detail[i].dayList[j].nameOfScence);
             String location = await callNativeMethod(trip.detail[i].dayList[j].nameOfScence);
             String longitude = location.split(',')[0];
             String latitude = location.split(',')[1];
             trip.detail[i].dayList[j].longitude = longitude;
             trip.detail[i].dayList[j].latitude = latitude;
-            trip.detail[i].dayList[j].picURL = newUrl.bingUrl;
+            trip.detail[i].dayList[j].picURL = '';
 
-            if (!context.mounted) return;
-            Provider.of<UserData>(context, listen: false).setFetchImgStatus('已获取【${trip.detail[i].dayList[j].nameOfScence}】的图片信息...');
+            //if (!context.mounted) return;
+            //Provider.of<UserData>(context, listen: false).setFetchImgStatus('已获取【${trip.detail[i].dayList[j].nameOfScence}】的图片信息...');
             tripList.add(trip.detail[i].dayList[j]);
             tripListIndex.add('${i.toString()}-${j.toString()}');
           }
@@ -434,12 +435,20 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
                       children: <Widget>[
                         Hero(
                           tag: widget.trips[index].uid,
-                          child: CachedNetworkImage(
+                          child: widget.trips[index].detail[0].dayList[0].picURL != '' || widget.trips[index].detail[0].dayList[0].picURL.isNotEmpty
+                          ?CachedNetworkImage(
                             imageUrl: widget.trips[index]?.cover != '' ? widget.trips[index]?.cover : widget.trips[index].detail[0].dayList[0].picURL,
                             width: MediaQuery.of(context).size.width,
                             height: 180,
                             fit: BoxFit.cover,
                           )
+                          :Container( 
+                            decoration: BoxDecoration(
+                              color: CommonUtils.randomColor(),
+                            ),
+                            width: MediaQuery.of(context).size.width,
+                            height: 180,
+                          ),
                         ),
                         Center(
                           child: SizedBox(
