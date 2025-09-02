@@ -6,6 +6,7 @@ import 'package:nextsticker2/pages/diy.dart';
 import 'package:provider/provider.dart';
 import 'package:nextsticker2/store/store.dart';
 import 'package:nextsticker2/pages/map_design.dart';
+import 'package:uuid/uuid.dart';
 
 class Myself extends StatefulWidget {
   final Function openSnackBar;
@@ -45,6 +46,7 @@ class Myself extends StatefulWidget {
 
 class MyselfState extends State<Myself> with TickerProviderStateMixin {
   late TabController _tabController;
+  final uuid = const Uuid();
   @override
   void initState() {
     super.initState();
@@ -86,6 +88,7 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
     //行程初始化模版
     TravelModel trip = TravelModel(
       designer: user.name,
+      uid: uuid.v4(),
       detail: [DayDetail(dayList: [])],
       domestic: 1,
     );

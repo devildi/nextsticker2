@@ -288,7 +288,7 @@ class DayDetail {
 }
 
 class TravelModel {
-  final String uid;
+  String uid;
   String tripName;
   String designer;
   String city;

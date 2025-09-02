@@ -9,6 +9,8 @@ import 'package:flutter_swiper_null_safety/flutter_swiper_null_safety.dart';
 import 'package:nextsticker2/widgets/swiper_item.dart';
 import 'package:flutter/services.dart';
 import 'package:nextsticker2/tools/tools.dart';
+import 'package:nextsticker2/widgets/queue.dart';
+import 'package:uuid/uuid.dart';
 
 class MyList extends StatefulWidget {
   final List trips;
@@ -19,6 +21,7 @@ class MyList extends StatefulWidget {
   final bool netWorkIsOn;
   final Function reFresh;
   final dynamic platform;
+  final Function updateListItem;
   const MyList({
     Key? key,
     required this.trips, 
@@ -28,7 +31,8 @@ class MyList extends StatefulWidget {
     required this.setTripData,
     required this.netWorkIsOn,
     required this.reFresh,
-    required this.platform
+    required this.platform,
+    required this.updateListItem
     }): super(key: key);
   @override
   MyListState createState() => MyListState();
@@ -43,10 +47,14 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
   bool loading = false;
   bool showBtn = false;
 
+  late AsyncQueue queue;
+
   final ScrollController _controller = ScrollController();
   final TextEditingController textController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final SwiperController _swiperController = SwiperController();
+
+  final uuid = const Uuid();
 
   Future <void>_onRefresh() async{
     debugPrint('下拉刷新');
@@ -116,6 +124,12 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
         }
       }
     });
+
+    queue = AsyncQueue(concurrency: 3, maxRetries: 2)
+    ..onTaskStart = (id){debugPrint("任务 $id 开始");} 
+    ..onTaskDone = (id) {debugPrint("任务 $id 完成");} 
+    ..onTaskError = (id, e) {debugPrint("任务 $id 出错: $e");} 
+    ..onQueueEmpty = () {debugPrint("所有任务完成 ✅");};
   }
 
   @override
@@ -190,6 +204,10 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
       );
       try{
         TravelModel trip = await TravelDao.fromLLM(textController.text);
+        trip.uid = uuid.v4();
+        if (!context.mounted) return;
+        Provider.of<UserData>(context, listen: false).setCloneData(trip);
+
         for (var i = 0; i < trip.detail.length; i++){
           for (var j = 0; j < trip.detail[i].dayList.length; j++){
             // BingCover newUrl = await TravelDao.getBing(trip.detail[i].dayList[j].nameOfScence);
@@ -200,7 +218,29 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
             trip.detail[i].dayList[j].longitude = longitude;
             trip.detail[i].dayList[j].latitude = latitude;
             trip.detail[i].dayList[j].picURL = '';
-
+            //添加异步队列：
+            queue.addTask(
+              trip.uid,
+              () async {
+              BingCover newUrl = await TravelDao.getBing(trip.detail[i].dayList[j].nameOfScence);
+              if (!context.mounted) return;
+              String uid = Provider.of<UserData>(context, listen: false).cloneData.uid;
+              if(uid != trip.uid){
+                TravelModel updatedTrip = await TravelDao.updatePoint(
+                  trip.uid, 
+                  trip.detail[i].dayList[j].nameOfScence, 
+                  null, 
+                  newUrl.bingUrl
+                );
+                if(updatedTrip.uid != ''){
+                  widget.updateListItem(updatedTrip);
+                  debugPrint('已在【后台】完善${trip.detail[i].dayList[j].nameOfScence}的图片和描述');
+                }
+              } else {
+                trip.detail[i].dayList[j].picURL = newUrl.bingUrl;
+                debugPrint('已获取【${trip.detail[i].dayList[j].nameOfScence}】的图片信息...');
+              }
+            });
             //if (!context.mounted) return;
             //Provider.of<UserData>(context, listen: false).setFetchImgStatus('已获取【${trip.detail[i].dayList[j].nameOfScence}】的图片信息...');
             tripList.add(trip.detail[i].dayList[j]);

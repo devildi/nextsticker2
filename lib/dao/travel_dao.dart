@@ -16,6 +16,7 @@ String getDesURL = '${urlBase}api/chat/getDes?';
 String getInfosURL = '${urlBase}api/chat/getInfos?';
 String formatTripUrl = '${urlBase}api/chat/formatTripFromLLM?';
 String deleteTripUrl = '${urlBase}api/trip/deleteTrip';
+String updatePointURL = '${urlBase}api/trip/updatePoint';
 
 class TravelDao{
   static Future<ReturnInfos> getInfos(str) async{
@@ -130,6 +131,20 @@ class TravelDao{
     final response = await Dio().post(deleteTripUrl, data: {'uid': uid});
     if (response.statusCode == 200) {
       return response.data;
+    } else {
+      throw Exception('Failed to delete trip!');
+    }
+  }
+
+  static Future updatePoint(uid, name, des, picURL) async{
+    final response = await Dio().post(updatePointURL, data: {
+      'uid': uid,
+      'nameOfScence':name,
+      'des': des,
+      'picURL': picURL
+    });
+    if (response.statusCode == 200) {
+      return TravelModel.fromJson(response.data);
     } else {
       throw Exception('Failed to delete trip!');
     }

@@ -23,7 +23,7 @@ class LastStepState extends State<LastStep> {
   final TextEditingController _controller8 = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   String tripName = '';
-
+  
   void tripNameChanged(String str){
     setState((){
       tripName = str;
@@ -92,6 +92,7 @@ class LastStepState extends State<LastStep> {
       _controller8.text = '';
       Navigator.pushReplacementNamed(context, '/');
       Provider.of<UserData>(context, listen: false).setIndex([0,0]);
+      Provider.of<UserData>(context, listen: false).setCloneData(TravelModel(detail: []));
     }catch(err){
       debugPrint(err.toString());
       setState(() {

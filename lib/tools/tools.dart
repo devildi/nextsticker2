@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:nextsticker2/model/travel_model.dart';
 
 class CommonUtils {
   static Color randomColor() {
@@ -152,5 +153,23 @@ class CommonUtils {
       return url.substring(baseUrl.length);  // 去掉前缀部分
     }
     return url;  // 如果没有这个前缀，返回原始 URL
+  }
+
+  static List<dynamic> tripItemAndIndex(TravelModel cloneTrip, nameOfScence) {
+    DetailModel item = DetailModel();
+    List index = [];
+    for (int i = 0; i < cloneTrip.detail.length; i++) {
+      if(cloneTrip.detail[i].dayList.isNotEmpty){
+        for (int j = 0; j < cloneTrip.detail[i].dayList.length; j++) {
+          if(cloneTrip.detail[i].dayList[j].nameOfScence == nameOfScence){
+            item = cloneTrip.detail[i].dayList[j];
+            index.add(i);
+            index.add(j);
+            break;
+          }
+        }
+      }
+    }
+    return [item, index];
   }
 }

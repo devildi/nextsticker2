@@ -29,6 +29,8 @@ import 'package:nextsticker2/widgets/drawer.dart';
 import 'package:nextsticker2/widgets/fab.dart';
 import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'package:animated_text_kit/animated_text_kit.dart';
+import 'package:nextsticker2/widgets/queue.dart';
+import 'package:nextsticker2/tools/tools.dart';
 //websocket请求格式：'http://localhost:4000/socket.io/?EIO=4&transport=polling&t=OIUQBge'
 //const wsURL = 'ws://localhost:4000';
 const wsURL = 'wss://nextsticker.cn';
@@ -162,6 +164,8 @@ class _MyHomePageState extends State<MyHomePage> {
   bool uploading = false;
 
   List<Future>tasks = [];
+
+  late AsyncQueue queue;
 
   void sethasInput(bool flag){
     setState(() {
@@ -369,6 +373,13 @@ class _MyHomePageState extends State<MyHomePage> {
           throw MissingPluginException();
       }
     });
+
+    queue = AsyncQueue(concurrency: 3, maxRetries: 2)
+    ..onTaskStart = (id){debugPrint("任务 $id 开始");} 
+    ..onTaskDone = (id) {debugPrint("任务 $id 完成");} 
+    ..onTaskError = (id, e) {debugPrint("任务 $id 出错: $e");} 
+    ..onQueueEmpty = () {debugPrint("所有任务完成 ✅");};
+
     initData(
       Provider.of<UserData>(context, listen: false).userData,
       Provider.of<UserData>(context, listen: false).auth
@@ -497,7 +508,15 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
   }
-
+  void updateListItem( TravelModel newItem) {
+    setState(() {
+      int index = tripList.indexWhere((item) => item.uid == newItem.uid);
+      if (index != -1) {
+        tripList[index] = newItem; // 替换
+      }
+      Provider.of<UserData>(context, listen: false).setTrips(tripList);
+    });
+  }
   Widget clickwhich(icon, string, ctx){
     num domestic = Provider.of<UserData>(context, listen: false).userData.domestic;
     
@@ -553,7 +572,7 @@ class _MyHomePageState extends State<MyHomePage> {
   _addToDayList(DetailModel item){
     TravelModel cloneTrip = Provider.of<UserData>(context, listen: false).cloneData;
     item.category = 0;
-    List indexAndCloneTripItem = indexAndTripItem(cloneTrip, item.nameOfScence);
+    List indexAndCloneTripItem = CommonUtils.tripItemAndIndex(cloneTrip, item.nameOfScence);
     List index = indexAndCloneTripItem[1];
     if(index.isNotEmpty){
       debugPrint('存在重复的点${item.nameOfScence}：在第${index[0] + 1}天第${index[1] + 1}个');
@@ -572,6 +591,34 @@ class _MyHomePageState extends State<MyHomePage> {
       Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
       Provider.of<UserData>(context, listen: false).setPoints([]);
       platform.invokeMethod('clear');
+      //添加异步队列
+      queue.addTask(
+        cloneTrip.uid,
+        () async {
+        final results = await Future.wait([
+          TravelDao.getBing(item.nameOfScence),
+          TravelDao.getDes(item.nameOfScence),
+        ]);
+        List index = CommonUtils.tripItemAndIndex(cloneTrip, item.nameOfScence)[1];
+        if(index.isNotEmpty){
+          cloneTrip.detail[index[0]].dayList[index[1]].picURL = results[0].bingUrl;
+          cloneTrip.detail[index[0]].dayList[index[1]].des = results[1].bingUrl;
+          if (!context.mounted) return;
+          Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
+          debugPrint('已添加${item.nameOfScence}的图片和描述');
+        } else{
+          TravelModel updatedTrip = await TravelDao.updatePoint(
+            cloneTrip.uid, 
+            item.nameOfScence, 
+            results[1].bingUrl, 
+            results[0].bingUrl
+          );
+          if(updatedTrip.uid != ''){
+            updateListItem(updatedTrip);
+            debugPrint('已在【后台】完善${item.nameOfScence}的图片和描述');
+          }
+        }
+      });
       _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[1]].dayList.length}个点', 1);
     }catch(err){
       debugPrint(err.toString());
@@ -589,7 +636,7 @@ class _MyHomePageState extends State<MyHomePage> {
     // if(location.isEmpty){
     //   location = [0, 0];
     // }
-    List indexAndCloneTripItem = indexAndTripItem(cloneTrip, item.nameOfScence);//检查是否有重复的点
+    List indexAndCloneTripItem = CommonUtils.tripItemAndIndex(cloneTrip, item.nameOfScence);//检查是否有重复的点
     List index = indexAndCloneTripItem[1];
     DetailModel tripItem = indexAndCloneTripItem[0];
     if(index.isNotEmpty){
@@ -603,29 +650,13 @@ class _MyHomePageState extends State<MyHomePage> {
       tasks.add(TravelDao.getDes(item.nameOfScence));
       Future.wait(tasks).then((value){
           Provider.of<UserData>(context, listen: false).setPicBing(value[0].bingUrl);
-          //Provider.of<UserData>(context, listen: false).setDes(value[1].bingUrl);
           _controller2.text = value[1].bingUrl;
           Provider.of<UserData>(context, listen: false).setLoading(false);
           tasks.clear();
       });
-      // try{
-      //   cloneTrip.detail[location[0]].dayList.add(item);
-      //   if (!context.mounted) return;
-      //   Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
-      //   Provider.of<UserData>(context, listen: false).setPoints([]);
-      //   platform.invokeMethod('clear');
-      //   _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[1]].dayList.length}个点', 1);
-      // }catch(err){
-      //   debugPrint(err.toString());
-      //   if (!context.mounted) return;
-      //   ScaffoldMessenger.of(context).showSnackBar(
-      //     const SnackBar(backgroundColor: Colors.red, content: Text('添加点出错，请稍后再试！', textAlign: TextAlign.center)),
-      //   );
-      // }
     } else {
       _controller1.text = tripItem.nameOfScence;
       _controller2.text = tripItem.des;
-      //_controller3.text = tripItem.picURL;
     }
     
     void save(cat, location)async {
@@ -638,7 +669,6 @@ class _MyHomePageState extends State<MyHomePage> {
         if(location.isEmpty){
           location = [0, 0];
         }
-        //print(location);
         bool flag = await platform.invokeMethod('InjectOnePoint',item.toJson().toString());
         if(flag){
           cloneTrip.detail[location[0]].dayList.add(item);
@@ -848,24 +878,6 @@ class _MyHomePageState extends State<MyHomePage> {
         ;
       },
     );
-  }
-
-  List<dynamic> indexAndTripItem(TravelModel cloneTrip, nameOfScence) {
-    DetailModel item = DetailModel();
-    List index = [];
-    for (int i = 0; i < cloneTrip.detail.length; i++) {
-      if(cloneTrip.detail[i].dayList.isNotEmpty){
-        for (int j = 0; j < cloneTrip.detail[i].dayList.length; j++) {
-          if(cloneTrip.detail[i].dayList[j].nameOfScence == nameOfScence){
-            item = cloneTrip.detail[i].dayList[j];
-            index.add(i);
-            index.add(j);
-            break;
-          }
-        }
-      }
-    }
-    return [item, index];
   }
 
   void openInforBar(){
@@ -1147,7 +1159,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _showMyDialog(context, index) async {
     return showDialog<void>(
       context: context,
-      barrierDismissible: false, // user must tap button!
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           title: index == 1 ? const Text('删除行程数据？') : const Text('开始记录足迹？'),
@@ -1256,6 +1268,7 @@ class _MyHomePageState extends State<MyHomePage> {
               netWorkIsOn: netWorkIsOn,
               reFresh: _reFresh,
               platform: platform,
+              updateListItem: updateListItem,
             ),
             Story(
               key: storyKey,
