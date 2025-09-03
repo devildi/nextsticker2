@@ -94,6 +94,7 @@ class InitTripState2 extends State<InitTrip2> {
         platform: widget.platform,
         tripData: trip,
         setTripData: (){},
+        onRefreshList: (){}
       )
     ));
   }

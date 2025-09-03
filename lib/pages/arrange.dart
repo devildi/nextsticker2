@@ -10,6 +10,7 @@ class Arrange extends StatefulWidget {
   final Function arrangeData;
   final Function delete;
   final String from;
+  final Function refreshList;
 
   const Arrange({
     Key? key,
@@ -19,6 +20,7 @@ class Arrange extends StatefulWidget {
     required this.arrangeData,
     required this.delete,
     required this.from,
+    required this.refreshList,
   }) : super(key: key);
 
   @override
@@ -169,6 +171,7 @@ class ArrangeState extends State<Arrange> {
             platform: widget.platform,
             trip: widget.tripData,
             save: () {},
+            refresh: widget.refreshList,
           ),
         ),
       );

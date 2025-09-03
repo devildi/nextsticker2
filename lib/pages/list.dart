@@ -332,6 +332,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
         width: MediaQuery.of(context).size.width,
         arrangeData: (){},
         delete: (){},
+        refreshList: widget.onRefresh,
         from: 'list',
       )
     ));
@@ -438,6 +439,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
   @override
   Widget build(BuildContext context) {
     AuthModel user = Provider.of<UserData>(context, listen: false).auth;
+    List trips = Provider.of<UserData>(context).trips;
     super.build(context);
     //print(widget.trips[1].cover);
     return Scaffold(
@@ -451,7 +453,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
         centerTitle: true,
         actions: [IconButton(icon: const Icon(Icons.search), color: Colors.white, onPressed: _search)],
       ),
-      body: (widget.trips.isEmpty != true
+      body: (trips.isEmpty != true
         ?Stack(
           children: [
             RefreshIndicator(
@@ -459,25 +461,26 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
               child: ListView.builder(
                 controller: _controller,
                 physics: const AlwaysScrollableScrollPhysics(),
-                itemCount: widget.trips.length,
+                itemCount: trips.length,
                 itemBuilder: (BuildContext context, int index){
                   return GestureDetector(
                     onTap: (){
                       Navigator.pushNamed(context, "detail", arguments:{
-                        "passData": widget.trips[index],
+                        "passData": trips[index],
                         "userData": widget.userData,
                         "fn": widget.setTripData,
                         "index": 1
                       });
                     },
-                    onLongPress: user.name == widget.trips[index].designer? () => deleteTrip(widget.trips[index]) : (){},
+                    onLongPress: user.name == trips[index].designer? () => deleteTrip(trips[index]) : (){},
                     child: Stack(
+                      key: ValueKey(trips[index].uid),
                       children: <Widget>[
                         Hero(
-                          tag: widget.trips[index].uid,
-                          child: widget.trips[index].detail[0].dayList[0].picURL != '' || widget.trips[index].detail[0].dayList[0].picURL.isNotEmpty
+                          tag: trips[index].uid,
+                          child: trips[index].detail[0].dayList[0].picURL != '' || trips[index].detail[0].dayList[0].picURL.isNotEmpty
                           ?CachedNetworkImage(
-                            imageUrl: widget.trips[index]?.cover != '' ? widget.trips[index]?.cover : widget.trips[index].detail[0].dayList[0].picURL,
+                            imageUrl: trips[index]?.cover != '' ? trips[index]?.cover : trips[index].detail[0].dayList[0].picURL,
                             width: MediaQuery.of(context).size.width,
                             height: 180,
                             fit: BoxFit.cover,
@@ -496,8 +499,8 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: <Widget>[
-                                Text('${widget.trips[index].tripName}',style: const TextStyle(fontSize: 30.0,color: Colors.white)),
-                                Text('by:  ${widget.trips[index].designer}',style: const TextStyle(fontSize: 20.0,color: Colors.white)),
+                                Text('${trips[index].tripName}',style: const TextStyle(fontSize: 30.0,color: Colors.white)),
+                                Text('by:  ${trips[index].designer}',style: const TextStyle(fontSize: 20.0,color: Colors.white)),
                               ],
                             ),
                           )

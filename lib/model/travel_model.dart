@@ -118,7 +118,7 @@ class ReturnBody {
       width: json["width"],
       height: json["height"],
       key: json["key"],
-      mimeType: json["mimeType"],
+      mimeType: json["mimeType"] ?? '' ,
     );
   }
 

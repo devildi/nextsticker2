@@ -42,7 +42,7 @@ class Detail extends StatelessWidget {
         actions: <Widget>[
           hasData(userData, passData)
           ? TextButton(onPressed: apply, child: const Text('应用数据', style:TextStyle(color: Colors.black)), )
-          : GestureDetector(child: Image.asset("assets/chatgpt.png"), onTap: () => {debugPrint('chatgpt')})
+          : Container()
         ],
       ),
       body: ListView(children: dataArray)

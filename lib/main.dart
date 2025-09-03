@@ -508,14 +508,16 @@ class _MyHomePageState extends State<MyHomePage> {
       },
     );
   }
-  void updateListItem( TravelModel newItem) {
-    setState(() {
-      int index = tripList.indexWhere((item) => item.uid == newItem.uid);
-      if (index != -1) {
-        tripList[index] = newItem; // 替换
-      }
-      Provider.of<UserData>(context, listen: false).setTrips(tripList);
-    });
+  void updateListItem(TravelModel newItem) {
+    List newTripList = List.from(tripList); // 🔑 新列表
+    int index = newTripList.indexWhere((item) => item.uid == newItem.uid);
+    if (index != -1) {
+      newTripList[index] = newItem;
+      // setState(() {
+      //  tripList = newTripList; 
+      // });
+    }
+    Provider.of<UserData>(context, listen: false).setTrips(newTripList);
   }
   Widget clickwhich(icon, string, ctx){
     num domestic = Provider.of<UserData>(context, listen: false).userData.domestic;
@@ -599,14 +601,18 @@ class _MyHomePageState extends State<MyHomePage> {
           TravelDao.getBing(item.nameOfScence),
           TravelDao.getDes(item.nameOfScence),
         ]);
-        List index = CommonUtils.tripItemAndIndex(cloneTrip, item.nameOfScence)[1];
-        if(index.isNotEmpty){
-          cloneTrip.detail[index[0]].dayList[index[1]].picURL = results[0].bingUrl;
-          cloneTrip.detail[index[0]].dayList[index[1]].des = results[1].bingUrl;
-          if (!context.mounted) return;
-          Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
-          debugPrint('已添加${item.nameOfScence}的图片和描述');
-        } else{
+        if (!context.mounted) return;
+        TravelModel newCloneTrip = Provider.of<UserData>(context, listen: false).cloneData;
+        if(newCloneTrip.uid != ''){
+          List index = CommonUtils.tripItemAndIndex(cloneTrip, item.nameOfScence)[1];
+          if(index.isNotEmpty){
+            cloneTrip.detail[index[0]].dayList[index[1]].picURL = results[0].bingUrl;
+            cloneTrip.detail[index[0]].dayList[index[1]].des = results[1].bingUrl;
+            if (!context.mounted) return;
+            Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
+            debugPrint('已添加${item.nameOfScence}的图片和描述');
+          }
+        }else{
           TravelModel updatedTrip = await TravelDao.updatePoint(
             cloneTrip.uid, 
             item.nameOfScence, 
@@ -1300,6 +1306,7 @@ class _MyHomePageState extends State<MyHomePage> {
               netWorkIsOn: netWorkIsOn,
               setTripData: setTripData,
               getMoreTripData: _addMoreData,
+              onRefresh: _onRefreshList, 
             )
           ]
         ),

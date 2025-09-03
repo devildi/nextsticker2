@@ -23,6 +23,7 @@ class Myself extends StatefulWidget {
   final bool netWorkIsOn;
   final Function setTripData;
   final Function getMoreTripData;
+  final Function onRefresh;
   const Myself({
     Key? key,
     required this.openSnackBar,
@@ -39,6 +40,7 @@ class Myself extends StatefulWidget {
     required this.netWorkIsOn,
     required this.setTripData,
     required this.getMoreTripData,
+    required this.onRefresh
   }): super(key: key);
   @override
   MyselfState createState() => MyselfState();
@@ -99,6 +101,7 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
         platform: widget.platform,
         tripData: trip,
         setTripData: widget.setTripData,
+        onRefreshList: widget.onRefresh
       )
     ));
   }

@@ -88,6 +88,7 @@ class DiyState extends State<Diy> {
         platform: widget.platform,
         tripData: trip,
         setTripData: widget.setTripData,
+        onRefreshList: (){}
       )
     ));
   }
@@ -122,17 +123,25 @@ class DiyState extends State<Diy> {
                     platform: widget.platform,
                     tripData: trips[index],
                     setTripData: widget.setTripData,
+                    onRefreshList: (){}
                   )
                 ));
               },
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(5, 5, 5, 0),
                   child:Row(children: [
-                    CachedNetworkImage(
+                    trips[index].detail[0].dayList[0].picURL != '' || trips[index].detail[0].dayList[0].picURL.isNotEmpty
+                    ?CachedNetworkImage(
                       imageUrl: trips[index]?.cover != '' ? trips[index]?.cover : trips[index].detail[0].dayList[0].picURL,
                       width: 80,
                       height: 80,
                       fit: BoxFit.cover,
+                    )
+                    :Container(
+                      width: 80,
+                      height: 80,
+                      color: Colors.grey,
+                      child: const Icon(Icons.image_not_supported, color: Colors.white)
                     ),
                     Container(width: 5),
                     Column(

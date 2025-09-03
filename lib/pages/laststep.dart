@@ -8,10 +8,12 @@ class LastStep extends StatefulWidget {
   final dynamic platform;
   final TravelModel trip;
   final Function save;
+  final Function refresh;
   const LastStep({
     required this.platform,
     required this.trip,
     required this.save,
+    required this.refresh,
     Key? key,
     }): super(key: key);
   @override
@@ -90,6 +92,7 @@ class LastStepState extends State<LastStep> {
         loading = false;
       });
       _controller8.text = '';
+      widget.refresh();
       Navigator.pushReplacementNamed(context, '/');
       Provider.of<UserData>(context, listen: false).setIndex([0,0]);
       Provider.of<UserData>(context, listen: false).setCloneData(TravelModel(detail: []));

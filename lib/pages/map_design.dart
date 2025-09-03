@@ -13,11 +13,13 @@ class MapDesign extends StatefulWidget {
   final TravelModel tripData;
   final dynamic platform;
   final Function setTripData;
+  final Function onRefreshList;
   const MapDesign({
     Key? key,
     required this.tripData,
     @required this.platform,
-    required this.setTripData
+    required this.setTripData,
+    required this.onRefreshList
     }): super(key: key);
   @override
   MapDesignState createState() => MapDesignState();
@@ -196,6 +198,7 @@ class MapDesignState extends State<MapDesign> {
         width: MediaQuery.of(context).size.width,
         arrangeData: arrangeData,
         delete: _delete,
+        refreshList: widget.onRefreshList,
         from: 'mapDesign',
       )
     ));
@@ -218,7 +221,8 @@ class MapDesignState extends State<MapDesign> {
         builder: (context) => LastStep(
           platform: widget.platform,
           trip: cloneTrip,
-          save: _save
+          save: _save,
+          refresh: widget.onRefreshList,
           //designer: designer,
           //domestic: domestic,
           //uid: uid
@@ -342,7 +346,11 @@ class MapDesignState extends State<MapDesign> {
             child:SizedBox(
               width: MediaQuery.of(context).size.width,
               height: MediaQuery.of(context).size.height,
-              child: platformView(cloneData.detail[0].dayList.isNotEmpty && cloneData.detail[0].dayList.isNotEmpty ? cloneData.detail[0].dayList[0].toJson().toString() : '')
+              child: platformView(
+                (cloneData.detail.isNotEmpty && cloneData.detail[0].dayList.isNotEmpty)
+                    ? cloneData.detail[0].dayList[0].toJson().toString()
+                    : ''
+              ),
             ),
           ),
           Positioned(
