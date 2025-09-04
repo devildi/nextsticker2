@@ -218,6 +218,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
             trip.detail[i].dayList[j].longitude = longitude;
             trip.detail[i].dayList[j].latitude = latitude;
             trip.detail[i].dayList[j].picURL = '';
+            trip.detail[i].dayList[j].category = 0;
             //添加异步队列：
             queue.addTask(
               trip.uid,
@@ -276,6 +277,8 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
                 return StatefulBuilder(
                   builder: (context, setState) {
                     return DetailCard(
+                      controller: _swiperController,
+                      flag:(tripList.length - Provider.of<UserData>(context, listen: false).swiperIndex) == 1,
                       trip: tripList[index],
                       tripIndex:tripListIndex[index],
                       dialogWidth: dialogWidth,
@@ -295,7 +298,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
                 },
                 // Swiper配置
                 layout: SwiperLayout.DEFAULT,
-                //pagination: const SwiperPagination(),  // 添加分页指示器
+                pagination: const SwiperPagination(),  // 添加分页指示器
                 //control: const SwiperControl(),  // 添加导航按钮
               ),
             )

@@ -8,6 +8,8 @@ class DetailCard extends StatefulWidget {
   final Function(int) updateCategory;
   final Function jump;
   final Function onDescriptionChanged;
+  final bool flag;
+  final dynamic controller;
 
   const DetailCard({
     Key? key,
@@ -17,6 +19,8 @@ class DetailCard extends StatefulWidget {
     required this.updateCategory,
     required this.jump,
     required this.onDescriptionChanged,
+    required this.flag,
+    required this.controller,
   }) : super(key: key);
     @override
   DetailCardState createState() => DetailCardState();
@@ -159,7 +163,7 @@ class DetailCardState extends State<DetailCard>{
                           borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-                      onPressed: () => widget.jump(),
+                      onPressed: widget.flag ? () => widget.jump() : (){widget.controller.next();},
                       child: const Text('下一步'),
                     ),
                   ),

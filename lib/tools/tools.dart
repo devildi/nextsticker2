@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 
 class CommonUtils {
+  static bool developmentMode = true;
   static Color randomColor() {
     List colors = [Colors.red[100], Colors.green[100], Colors.yellow[100], Colors.orange[100]];
     Random random = Random();

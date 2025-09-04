@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:nextsticker2/model/article_model.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
-bool developmentMode = true;
-String urlBase = developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
+String urlBase = CommonUtils.developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
 
 String urL = '${urlBase}api/trip/getAllStory?page=';
 String poMicroURL = '${urlBase}api/trip/newItem';

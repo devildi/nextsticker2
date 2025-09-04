@@ -2,9 +2,9 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'dart:convert'; 
 import 'package:nextsticker2/model/travel_model.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
-bool developmentMode = true;
-String urlBase = developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
+String urlBase = CommonUtils.developmentMode ? "http://172.20.10.13:4000/" : "https://nextsticker.cn/";
 
 String urL = '${urlBase}api/trip/get?uid=';
 String urLForAllTrip = '${urlBase}api/trip/getAllTrip?';
