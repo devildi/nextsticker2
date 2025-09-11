@@ -625,7 +625,7 @@ class _MyHomePageState extends State<MyHomePage> {
           }
         }
       });
-      _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[1]].dayList.length}个点', 1);
+      _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[0]].dayList.length}个点', 1);
     }catch(err){
       debugPrint(err.toString());
       if (!context.mounted) return;
