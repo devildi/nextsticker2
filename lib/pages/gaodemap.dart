@@ -5,7 +5,7 @@ import 'dart:convert' as convert;
 import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter_swiper_null_safety/flutter_swiper_null_safety.dart';
+import 'package:card_swiper/card_swiper.dart';
 
 class GaodeMap extends StatefulWidget {
   final String points;

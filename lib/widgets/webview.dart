@@ -1,12 +1,11 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class WebViewExample extends StatefulWidget {
   final String url;
   const WebViewExample({
-    Key? key, 
+    Key? key,
     required this.url
   }) : super(key: key);
   @override
@@ -18,13 +17,39 @@ var list = ['引人不适', '内容质量较差', '过期内容', '标题党封�
 List<Widget> widgets = [];
 
 class WebViewExampleState extends State<WebViewExample> {
-  final Completer<WebViewController> _controller = Completer<WebViewController>();
+  late WebViewController _controller;
   bool hasLoaded = false;
-  
+
   @override
   void initState() {
     super.initState();
-    if (Platform.isAndroid) WebView.platform = SurfaceAndroidWebView();
+    // Initialize WebViewController with the new API
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(NavigationDelegate(
+        onPageStarted: (String url) {
+          debugPrint('Page started loading: $url');
+        },
+        onPageFinished: (String url) {
+          setState(() {
+            hasLoaded = true;
+          });
+          debugPrint('Page finished loading: $url');
+        },
+        onNavigationRequest: (NavigationRequest request) {
+          if (request.url.startsWith('https://www.youtube.com/')) {
+            return NavigationDecision.prevent;
+          }
+          return NavigationDecision.navigate;
+        },
+      ))
+      ..addJavaScriptChannel(
+        'Toaster',
+        onMessageReceived: (JavaScriptMessage message) {
+          debugPrint('JS message: ${message.message}');
+        },
+      )
+      ..loadRequest(Uri.parse(widget.url));
   }
 
   void fedback(str){
@@ -117,63 +142,24 @@ class WebViewExampleState extends State<WebViewExample> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('故事'),
-        centerTitle:true,
+        centerTitle: true,
         actions: <Widget>[
           TextButton(
             onPressed: _show,
-            child: const Text('内容反馈', style: TextStyle(color: Colors.white),),
+            child: const Text('内容反馈', style: TextStyle(color: Colors.white)),
           )
         ]
       ),
-      // We're using a Builder here so we have a context that is below the Scaffold
-      // to allow calling Scaffold.of(context) so we can show a snackbar.
-      body: Builder(builder: (BuildContext context) {
-        return Stack(
-          children: [
-            WebView(
-              initialUrl: widget.url,
-              javascriptMode: JavascriptMode.unrestricted,
-              onWebViewCreated: (WebViewController webViewController) {
-                _controller.complete(webViewController);
-              },
-              //javascriptChannels: <JavascriptChannel>[_toasterJavascriptChannel(context)].toSet(),
-              javascriptChannels: {_toasterJavascriptChannel(context)},
-              navigationDelegate: (NavigationRequest request) {
-                if (request.url.startsWith('https://www.youtube.com/')) {
-                  //print('blocking navigation to $request}');
-                  return NavigationDecision.prevent;
-                }
-                //print('allowing navigation to $request');
-                return NavigationDecision.navigate;
-              },
-              onPageStarted: (String url) {
-                //print('Page started loading');
-              },
-              onPageFinished: (String url) {
-                //print('Page finished loading');
-                setState(() {
-                  hasLoaded = true;      
-                });
-              },
-              gestureNavigationEnabled: true,
-            ),
-            hasLoaded == false
-            ?const Center(
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          hasLoaded == false
+          ? const Center(
               child: CircularProgressIndicator(),
             )
-            :Container()
-          ],
-        );
-      }),
+          : Container()
+        ],
+      ),
     );
   }
-}
-JavascriptChannel _toasterJavascriptChannel(BuildContext context) {
-  return JavascriptChannel(
-    name: 'Toaster',
-    onMessageReceived: (JavascriptMessage message) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message.message)),
-      );
-    });
 }

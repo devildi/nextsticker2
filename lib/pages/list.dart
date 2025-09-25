@@ -5,7 +5,7 @@ import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
 import 'package:nextsticker2/dao/travel_dao.dart';
 import 'package:nextsticker2/pages/arrange.dart';
-import 'package:flutter_swiper_null_safety/flutter_swiper_null_safety.dart';
+import 'package:card_swiper/card_swiper.dart';
 import 'package:nextsticker2/widgets/swiper_item.dart';
 import 'package:flutter/services.dart';
 import 'package:nextsticker2/tools/tools.dart';
