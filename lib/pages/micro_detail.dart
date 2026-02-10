@@ -239,15 +239,31 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
               aspectRatio: width / height,
               child: VideoPlayer(_controller),
             )
-            :Center(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const CircularProgressIndicator(),
-                  const SizedBox(width: 10),
-                  Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.grey))
-                ], 
-              ),
+            :Stack(
+              alignment: Alignment.center,
+              children: [
+                ImageWithFallback(
+                  remoteURL: widget.articleFromStoryPage.picURL,
+                  resourceId: CommonUtils.removeBaseUrl(widget.articleFromStoryPage.picURL),
+                  width: widget.articleFromStoryPage.width.toDouble(),
+                  picWidth: widget.articleFromStoryPage.width.toDouble(),
+                  picHeight: widget.articleFromStoryPage.height.toDouble(),
+                  name: widget.articleFromStoryPage.articleName
+                ),
+                Container(
+                  color: Colors.black26, 
+                  child: Center(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const CircularProgressIndicator(),
+                        const SizedBox(width: 10),
+                        Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.white))
+                      ], 
+                    ),
+                  ),
+                )
+              ],
             )
         );
     }

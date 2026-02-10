@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'dart:math';
-import "package:images_picker/images_picker.dart";
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import 'package:video_player/video_player.dart';
@@ -24,220 +23,238 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
   @override
   bool get wantKeepAlive => true;
   final storage = Storage();
-  late PutController putController;
-
-  late VideoPlayerController _controller;
+  
+  VideoPlayerController? _controller;
   final TextEditingController _controller1 = TextEditingController();
   final TextEditingController _controller2 = TextEditingController();
-  List medias = [];
-  dynamic picData;
-  List<Future>tasks = [];
+  List<XFile> medias = [];
+  Uint8List? picData;
+  
   String title = '';
   String content = '';
   bool uploading = false;
-  double progress = 0.0;
+  
+  // Progress tracking
+  double videoProgress = 0.0;
+  double thumbProgress = 0.0;
 
   @override
   void dispose() {
-    super.dispose();
     _controller1.dispose();
     _controller2.dispose();
-    _controller.dispose();
+    _controller?.dispose();
+    super.dispose();
   }
 
-  Future startUploadToQiniu(token, path, flag) async{
-    debugPrint('创建 PutController');
-    putController = PutController();
-    debugPrint('添加实际发送进度订阅');
-    putController.addSendProgressListener((double percent) {
-      debugPrint('已上传进度变化：已发送：$percent');
-    });
-    debugPrint('添加任务进度订阅');
+  // flag: true for bytes (thumbnail), false for file (video)
+  Future<ReturnBody?> startUploadToQiniu(String token, dynamic source, bool isThumbnail) async{
+    PutController putController = PutController();
+    
     putController.addProgressListener((double percent) {
-      debugPrint('任务进度变化：已发送：$percent');
-      setState(() {
-        progress = percent;
-      });
+      if(mounted) {
+        setState(() {
+          if (isThumbnail) {
+            thumbProgress = percent;
+          } else {
+            videoProgress = percent;
+          }
+        });
+      }
     });
-    debugPrint('添加状态订阅');
-    putController.addStatusListener((StorageStatus status) {
-      debugPrint('状态变化: 当前任务状态：$status');
-    });
-    debugPrint('开始上传文件');
+
     final putOptions = PutOptions(
       controller: putController
     );
+    
     Future<PutResponse> upload;
-    if(flag){
+    if(isThumbnail){
+      // source is Uint8List
       upload = storage.putBytes(
-        path,
+        source,
         token,
         options: putOptions,
       );
     }else{
+      // source is path String
       upload = storage.putFile(
-        File(path),
+        File(source),
         token,
         options: putOptions,
       );
     }
+    
     try{
       PutResponse response = await upload;
-      debugPrint('上传已完成: 原始响应数据: ${response.rawData}');
-      debugPrint('------------------------');
-      ReturnBody body = ReturnBody.fromJson(response.rawData);
-      return body;
+      debugPrint('上传完成 (${isThumbnail ? "缩略图" : "视频"}): ${response.key}');
+      
+      // For video, we will use local dimensions in the final step, 
+      // but we return the body here as per protocol.
+      return ReturnBody.fromJson(response.rawData);
     } catch(error){
-      if (error is StorageError) {
-        switch (error.type) {
-          case StorageErrorType.CONNECT_TIMEOUT:
-            debugPrint('发生错误: 连接超时');
-            break;
-          case StorageErrorType.SEND_TIMEOUT:
-            debugPrint('发生错误: 发送数据超时');
-            break;
-          case StorageErrorType.RECEIVE_TIMEOUT:
-            debugPrint('发生错误: 响应数据超时');
-            break;
-          case StorageErrorType.RESPONSE:
-            debugPrint('发生错误: ${error.message}');
-            break;
-          case StorageErrorType.CANCEL:
-            debugPrint('发生错误: 请求取消');
-            break;
-          case StorageErrorType.UNKNOWN:
-            debugPrint('发生错误: 未知错误');
-            break;
-          case StorageErrorType.NO_AVAILABLE_HOST:
-            debugPrint('发生错误: 无可用 Host');
-            break;
-          case StorageErrorType.IN_PROGRESS:
-            debugPrint('发生错误: 已在队列中');
-            break;
-        }
-      } else {
-        debugPrint('发生错误: ${error.toString()}');
-      }
-      debugPrint('------------------------');
+      debugPrint('上传失败: ${error.toString()}');
+      return null;
     }
   }
 
-  void upToServer(body, fn, height, width, title, content, uid, initUserData) async{
-    List picArr = [];
-    for (var i = 0; i < body.length; i++) {
-      picArr.add(body[i].toJson());
-    }
+  void upToServer(ReturnBody videoBody, ReturnBody thumbBody, double height, double width, String title, String content, dynamic uid, Function initUserData) async{
     try{
       dynamic res = await StoryDao.poMicro({
         'articleName': title,
         'articleContent': content,
-        'picURL': body[1].key,
-        'videoURL': body[0].key,
-        'width': width,
-        'height': height,
+        'picURL': thumbBody.key,
+        'videoURL': videoBody.key,
+        'width': width.toString(),
+        'height': height.toString(),
         'articleType': 3,
         'author': uid,
       });
-      if(res != null){
-        setState(() {
-          uploading = false;
+      
+      if(mounted) {
+        if(res != null){
+          setState(() {
+            uploading = false;
+          });
           Navigator.of(context).pop();
-          fn('发布成功！', 1);
           initUserData(true);
-        });
+        } else {
+           setState(() {
+            uploading = false;
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('发布失败，请重试')),
+          );
+        }
       }
     }catch(err){
       debugPrint(err.toString());
-      setState(() {
-        uploading = false;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(backgroundColor: Colors.blue, content: Text('网络错误，发布失败！', textAlign: TextAlign.center)),
-        );
-      });
-    }
-  }
-
-  Future _add(platform) async {
-    List res = [];
-    if(defaultTargetPlatform == TargetPlatform.iOS){
-      res = await (ImagesPicker.pick(
-        count: 1,
-        pickType: PickType.video
-      )) as List<dynamic>;
-    }else{
-      final ImagePicker picker = ImagePicker();
-      final XFile video1 = await (picker.pickVideo(source: ImageSource.gallery)) as XFile;
-      res.add(video1);
-    } 
-    if(res.isNotEmpty){
-      _controller = VideoPlayerController.file(File(res[0].path))
-      ..initialize().then((_) {
+      if(mounted) {
         setState(() {
-         
+          uploading = false;
         });
-        _controller.play();
-        _controller.setLooping(true);
-        _controller.setVolume(0.0);
-      });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(backgroundColor: Colors.red, content: Text('网络错误，发布失败！', textAlign: TextAlign.center)),
+        );
+      }
+    }
+  }
+
+  Future _add() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? video = await picker.pickVideo(source: ImageSource.gallery);
+    
+    if(video != null){
+      // Dispose old controller if exists
+      _controller?.dispose();
+      
+      final controller = VideoPlayerController.file(File(video.path));
+      await controller.initialize();
+      controller.setLooping(true);
+      controller.setVolume(1.0); 
+      controller.play();
+
       final uint8list = await VideoThumbnail.thumbnailData(
-        video: res[0].path,
+        video: video.path,
         imageFormat: ImageFormat.JPEG,
-        quality: 25,
+        quality: 50, 
       );
+
       setState(() {
-        medias = res;
+        medias = [video];
         picData = uint8list;
+        _controller = controller;
       });
     }
   }
 
-  void delete(index){
+  void delete(){
+    _controller?.dispose();
     setState(() {
-      medias.removeAt(index);
-      medias = medias;
+      medias = [];
+      picData = null;
+      _controller = null;
     });
   }
 
-  Widget picContainer(index){
-    return 
-      Stack(
-        children: [
-          Container(
-            width: MediaQuery.of(context).size.width - 40, 
-            height: (MediaQuery.of(context).size.width - 40) / _controller.value.aspectRatio,
-            margin: const EdgeInsets.fromLTRB(0, 0, 5, 0),
-            clipBehavior: Clip.hardEdge,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.all(Radius.circular(20)),
-              color: randomColor(),
-            ),
-            child: AspectRatio(
-              aspectRatio: _controller.value.aspectRatio,
-              child: VideoPlayer(_controller),
-            )
+  Widget picContainer(){
+    if (_controller == null || !_controller!.value.isInitialized) {
+      return Container();
+    }
+    
+    return Stack(
+      children: [
+        Container(
+          width: MediaQuery.of(context).size.width - 40, 
+          height: (MediaQuery.of(context).size.width - 40) / _controller!.value.aspectRatio,
+          margin: const EdgeInsets.fromLTRB(0, 0, 5, 0),
+          clipBehavior: Clip.hardEdge,
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.all(Radius.circular(20)),
+            color: Colors.black,
           ),
-          Positioned(
-            top: 0,
-            right: 5,
-            child: IconButton(
-              onPressed: () => delete(index),
-              icon: const Icon(Icons.clear, color: Colors.white, size: 30,)
-            ),
+          child: AspectRatio(
+            aspectRatio: _controller!.value.aspectRatio,
+            child: VideoPlayer(_controller!),
           )
-        ],
-      );
+        ),
+        Positioned(
+          top: 0,
+          right: 5,
+          child: IconButton(
+            onPressed: delete,
+            icon: const Icon(Icons.clear, color: Colors.white, size: 30,)
+          ),
+        )
+      ],
+    );
   }
 
-  void _submit(fn, uid, initUserData)async{
+  void _submit(dynamic uid, Function initUserData)async{
+    if (medias.isEmpty || picData == null || _controller == null) return;
+    
     FocusScope.of(context).unfocus();
-    String token = await Micro.getToken('3');
+    
     setState(() {
       uploading = true;
+      videoProgress = 0.0;
+      thumbProgress = 0.0;
     });
-    tasks.add(startUploadToQiniu(token, medias[0].path, false));
-    tasks.add(startUploadToQiniu(token, picData, true));
-    List body = await Future.wait(tasks);
-    upToServer(body, fn, _controller.value.size.height, _controller.value.size.width, title, content, uid, initUserData);
+
+    try {
+      String token = await Micro.getToken('3'); 
+      
+      // Parallel uploads
+      var videoTask = startUploadToQiniu(token, medias[0].path, false);
+      var thumbTask = startUploadToQiniu(token, picData, true);
+      
+      List<ReturnBody?> results = await Future.wait([videoTask, thumbTask]);
+      
+      ReturnBody? videoRes = results[0];
+      ReturnBody? thumbRes = results[1];
+
+      if (videoRes != null && thumbRes != null) {
+        upToServer(videoRes, thumbRes, _controller!.value.size.height, _controller!.value.size.width, title, content, uid, initUserData);
+      } else {
+         if(mounted) {
+            setState(() {
+              uploading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(backgroundColor: Colors.red, content: Text('上传失败，请重试')),
+            );
+         }
+      }
+      
+    } catch (e) {
+      debugPrint("Error: $e");
+      if(mounted) {
+        setState(() {
+          uploading = false;
+        });
+         ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.red, content: Text('发生错误，请重试')),
+          );
+      }
+    }
   }
 
   void _titleChanged(String str){
@@ -252,11 +269,13 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
     });
   }
 
-  void back(socket){
-    if(socket != null){
-      Navigator.of(context).pop();
-    }
+  void back(){
     Navigator.of(context).pop();
+  }
+  
+  // Weighted progress: Video 95%, Thumb 5%
+  double get totalProgress {
+    return (videoProgress * 0.95) + (thumbProgress * 0.05);
   }
 
   @override
@@ -264,19 +283,20 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
     super.build(context);
     final theme = Theme.of(context);
     final dynamic data = ModalRoute.of(context)?.settings.arguments;
-    final Function openSnackBar = data["openSnackBar"];
-    final platform = data["platform"];
-    final socket = data["socket"];
-    final uid = data["uid"];
-    final Function initUserData = data["initUserData"];
+    // final Function openSnackBar = data["openSnackBar"]; // Unused locally
+    // final platform = data["platform"];
+    // final socket = data != null ? data["socket"] : null; 
+    final uid = data != null ? data["uid"] : null;
+    final Function initUserData = data != null ? data["initUserData"] ?? (val){} : (val){};
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text('发视频'),
         centerTitle:true,
-        leading: GestureDetector(child: const Icon(Icons.arrow_back_ios),onTap: () => back(socket)),
+        leading: GestureDetector(child: const Icon(Icons.arrow_back_ios),onTap: back),
         actions:<Widget>[
           TextButton(
-            onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(openSnackBar, uid, initUserData)),
+            onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(uid, initUserData)),
             child: Text('发布', style: TextStyle(color: (medias.isEmpty|| title == '' || content == '' ?Colors.grey: Colors.black))),
           )
         ]
@@ -287,9 +307,6 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
             width: MediaQuery.of(context).size.width,
             margin: const EdgeInsets.fromLTRB(10, 10, 10, 10),
             padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-            decoration: const BoxDecoration(
-              //color: Color.fromARGB(255, 218, 208, 208), 
-            ),
             child: ListView(children: [
               medias.isEmpty
               ?SizedBox(
@@ -304,14 +321,14 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
                   ),
                   child: Center(
                     child: IconButton(
-                      onPressed: () => _add(platform),
+                      onPressed: _add,
                       icon: const Icon(Icons.add_circle_outline, color: Colors.black, size: 30,),
                       color: theme.colorScheme.onSecondary,
                     )
                   ),
                 ),
               )
-              :picContainer(0),
+              : picContainer(),
               TextField(
                 onChanged: _titleChanged,
                 controller: _controller1,
@@ -333,24 +350,27 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
               const Divider()
             ]),
           ),
-          uploading == true
-          ?const Center(
-            child: CircularProgressIndicator(),
-          )
-          :Container(),
-          uploading == true
-          ?Center(
-            child: Text('${(progress * 100).round()}%', style: const TextStyle(color: Colors.grey),)
-          )
-          :Container(),
-          uploading == true
-          ?LinearProgressIndicator(
-            value: progress,
-            minHeight: 10,
-            backgroundColor: Colors.grey,
-            valueColor: const AlwaysStoppedAnimation(Colors.blue)
-          )
-          :Container(),
+          if (uploading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                     SizedBox(
+                       width: 200,
+                       child: LinearProgressIndicator(
+                         value: totalProgress,
+                         backgroundColor: Colors.grey,
+                         valueColor: const AlwaysStoppedAnimation(Colors.blue),
+                       ),
+                     ),
+                     const SizedBox(height: 16),
+                     Text("上传中 ${(totalProgress * 100).toInt()}%", style: const TextStyle(color: Colors.white))
+                  ],
+                ),
+              ),
+            ),
         ],
       )
     );
