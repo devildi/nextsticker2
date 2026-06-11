@@ -8,7 +8,7 @@ import 'package:nextsticker2/dao/story_dao.dart';
 import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter/foundation.dart';
+//import 'package:flutter/foundation.dart';
 
 class EditMicro extends StatefulWidget {
   const EditMicro({

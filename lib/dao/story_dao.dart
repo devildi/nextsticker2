@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:nextsticker2/model/article_model.dart';
 import 'package:nextsticker2/tools/tools.dart';
 
-String urlBase = CommonUtils.developmentMode ? "http://10.96.162.50:4000/" : "https://nextsticker.cn/";
+String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
 
 String urL = '${urlBase}api/trip/getAllStory?page=';
 String poMicroURL = '${urlBase}api/trip/newItem';

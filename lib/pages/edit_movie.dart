@@ -187,8 +187,8 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
           height: (MediaQuery.of(context).size.width - 40) / _controller!.value.aspectRatio,
           margin: const EdgeInsets.fromLTRB(0, 0, 5, 0),
           clipBehavior: Clip.hardEdge,
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.all(Radius.circular(20)),
+          decoration: const BoxDecoration(
+            borderRadius: BorderRadius.all(Radius.circular(20)),
             color: Colors.black,
           ),
           child: AspectRatio(
@@ -293,7 +293,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
       appBar: AppBar(
         title: const Text('发视频'),
         centerTitle:true,
-        leading: GestureDetector(child: const Icon(Icons.arrow_back_ios),onTap: back),
+        leading: GestureDetector(onTap: back, child: const Icon(Icons.arrow_back_ios)),
         actions:<Widget>[
           TextButton(
             onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(uid, initUserData)),
