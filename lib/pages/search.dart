@@ -3,6 +3,7 @@ import 'package:nextsticker2/dao/travel_dao.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class Search extends StatefulWidget {
   const Search({
@@ -18,6 +19,43 @@ class SearchState extends State<Search>{
   bool isLoading = false;
   bool hasLoaded = false;
   bool networkState = true;
+  final Set<String> _failedImages = {};
+
+  void _handleImageError(dynamic trip) async {
+    final bool isCover = trip.cover != '';
+    final String nameOfScence = (trip.detail.isNotEmpty && trip.detail[0].dayList.isNotEmpty)
+        ? trip.detail[0].dayList[0].nameOfScence
+        : '';
+    final String queryKey = '${trip.uid}_${isCover ? "cover" : nameOfScence}';
+    
+    if (_failedImages.contains(queryKey)) return;
+    _failedImages.add(queryKey);
+    
+    final String searchName = isCover ? (trip.city != '' ? trip.city : nameOfScence) : nameOfScence;
+    if (searchName.isEmpty) return;
+
+    debugPrint('检测到图片链接失效，正在请求后台更新: $searchName');
+    String newUrl = await TravelDao.handleImageFailure(
+      uid: trip.uid,
+      tripName: trip.tripName,
+      nameOfScence: searchName,
+      isCover: isCover,
+    );
+    
+    if (newUrl.isNotEmpty) {
+      debugPrint('后台图片已更新: $newUrl');
+      if (mounted) {
+        setState(() {
+          if (isCover) {
+            trip.cover = newUrl;
+          } else {
+            trip.detail[0].dayList[0].picURL = newUrl;
+          }
+        });
+      }
+    }
+  }
+
   //String destination = '';
 
   @override
@@ -86,27 +124,47 @@ class SearchState extends State<Search>{
             },
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
-              child: Container(
-                decoration: BoxDecoration(
-                  image: DecorationImage(
-                    image: NetworkImage(element.detail[0].dayList[0].picURL),
-                    fit: BoxFit.cover,
-                  ),
-                ),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Text(
-                      element.tripName,
-                      style: const TextStyle(color: Colors.white, fontSize: 20),
+              child: SizedBox(
+                width: double.infinity,
+                height: double.infinity,
+                child: Stack(
+                  children: [
+                    Positioned.fill(
+                      child: (element.cover != '' || element.detail[0].dayList[0].picURL != '')
+                          ? CachedNetworkImage(
+                              imageUrl: element.cover != '' ? element.cover : element.detail[0].dayList[0].picURL,
+                              fit: BoxFit.cover,
+                              errorWidget: (context, url, error) {
+                                _handleImageError(element);
+                                return Image.asset(
+                                  "assets/trip_fallback.png",
+                                  fit: BoxFit.cover,
+                                );
+                              },
+                            )
+                          : Image.asset(
+                              "assets/trip_fallback.png",
+                              fit: BoxFit.cover,
+                            ),
                     ),
-                    Text(
-                      element.city,
-                      style: const TextStyle(color: Colors.white, fontSize: 20),
+                    Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: <Widget>[
+                          Text(
+                            element.tripName,
+                            style: const TextStyle(color: Colors.white, fontSize: 20),
+                          ),
+                          Text(
+                            element.city,
+                            style: const TextStyle(color: Colors.white, fontSize: 20),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              )
+              ),
             )),
           );
       });

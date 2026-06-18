@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -11,6 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:nextsticker2/tools/tools.dart';
 import 'package:nextsticker2/widgets/queue.dart';
 import 'package:uuid/uuid.dart';
+import 'package:nextsticker2/pages/map_design.dart';
+import 'package:nextsticker2/tools/sync_helper.dart';
 
 class MyList extends StatefulWidget {
   final List trips;
@@ -22,6 +25,7 @@ class MyList extends StatefulWidget {
   final Function reFresh;
   final dynamic platform;
   final Function updateListItem;
+  final Function initUserData;
   const MyList({
     Key? key,
     required this.trips, 
@@ -32,7 +36,8 @@ class MyList extends StatefulWidget {
     required this.netWorkIsOn,
     required this.reFresh,
     required this.platform,
-    required this.updateListItem
+    required this.updateListItem,
+    required this.initUserData,
     }): super(key: key);
   @override
   MyListState createState() => MyListState();
@@ -97,6 +102,169 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
     Navigator.pushNamed(context, "search", arguments:{
       "userData": widget.userData,
       "fn": widget.setTripData
+    });
+  }
+
+  void _goToMapDesign() {
+    final AuthModel user = Provider.of<UserData>(context, listen: false).auth;
+    TravelModel trip = TravelModel(
+      designer: user.name,
+      uid: uuid.v4(),
+      detail: [DayDetail(dayList: [])],
+      domestic: 1,
+    );
+    Provider.of<UserData>(context, listen: false).setCloneData(trip);
+    Navigator.push(context, MaterialPageRoute(
+      builder: (context) => MapDesign(
+        platform: widget.platform,
+        tripData: trip,
+        setTripData: widget.setTripData,
+        onRefreshList: widget.onRefresh
+      )
+    ));
+  }
+
+  void Function(String)? _syncMessageUpdater;
+  void _updateSyncMessage(String msg) {
+    if (_syncMessageUpdater != null) {
+      _syncMessageUpdater!(msg);
+    }
+  }
+
+  void _showSyncDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('数据同步选项'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('请选择要执行的数据同步操作：\n(同步范围包含本地及服务器的行程与故事列表)'),
+              SizedBox(height: 10),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performSync(2); // 覆盖服务器
+              },
+              child: const Text('覆盖服务器数据'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performSync(3); // 覆盖本地
+              },
+              child: const Text('覆盖本地数据'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performSync(int option) {
+    String progressMessage = '正在检查数据...';
+    _syncMessageUpdater = null; // 清空旧的回调
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            _syncMessageUpdater = (msg) {
+              setDialogState(() {
+                progressMessage = msg;
+              });
+            };
+            return AlertDialog(
+              content: Row(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Text(
+                      progressMessage,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    Future.sync(() async {
+      // 等待 dialog 首帧渲染完成再开始异步操作
+      await Future.delayed(Duration.zero);
+      final UserData userData = Provider.of<UserData>(context, listen: false);
+      final AuthModel user = userData.auth;
+      try {
+        // 0. 检查是否需要同步
+        _updateSyncMessage('正在检查数据差异...');
+        final bool syncNeeded = await SyncHelper.needsSync();
+        if (!syncNeeded) {
+          if (mounted) {
+            Navigator.of(context).pop();
+            _syncMessageUpdater = null;
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(backgroundColor: Colors.blue, content: Text('数据已是最新，无需同步！', textAlign: TextAlign.center)),
+            );
+          }
+          return;
+        }
+
+        _updateSyncMessage('正在初始化同步...');
+        // 1. Sync Trips
+        await SyncHelper.syncTrips(
+          option: option,
+          auth: user,
+          onProgress: (msg) {
+            _updateSyncMessage('[行程] $msg');
+          },
+        );
+
+        // 2. Sync Stories
+        await SyncHelper.syncStories(
+          option: option,
+          auth: user,
+          onProgress: (msg) {
+            _updateSyncMessage('[故事] $msg');
+          },
+        );
+
+        // 3. Refresh lists
+        _updateSyncMessage('正在刷新本地视图数据...');
+        await widget.onRefresh();
+        await widget.initUserData(true);
+
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          _syncMessageUpdater = null;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.blue, content: Text('数据同步成功！', textAlign: TextAlign.center)),
+          );
+        }
+      } catch (e) {
+        debugPrint('Sync failed: $e');
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          _syncMessageUpdater = null;
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(backgroundColor: Colors.red, content: Text('同步失败: $e', textAlign: TextAlign.center)),
+          );
+        }
+      }
     });
   }
 
@@ -448,7 +616,16 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue,
-        leading:GestureDetector(onTap: _ds, child: Image.asset("assets/chatgpt.png")),
+        leadingWidth: 85,
+        leading: GestureDetector(
+          onTap: _goToMapDesign,
+          child: const Center(
+            child: Text(
+              '行程设计',
+              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
         title: GestureDetector(
           onTap: (){},
           child: const Text('NextSticker', style: TextStyle(color: Colors.white)),
@@ -456,7 +633,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
         centerTitle: true,
         actions: [IconButton(icon: const Icon(Icons.search), color: Colors.white, onPressed: _search)],
       ),
-      body: (trips.isEmpty != true
+      body: (trips.isNotEmpty
         ?Stack(
           children: [
             RefreshIndicator(
@@ -496,18 +673,81 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
                             height: 180,
                           ),
                         ),
-                        Center(
-                          child: SizedBox(
-                            height: 180,
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: <Widget>[
-                                Text('${trips[index].tripName}',style: const TextStyle(fontSize: 30.0,color: Colors.white)),
-                                Text('by:  ${trips[index].designer}',style: const TextStyle(fontSize: 20.0,color: Colors.white)),
-                              ],
+                        // Dark overlay gradient to softly tone down the image
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  Colors.black.withOpacity(0.15),
+                                  Colors.black.withOpacity(0.45),
+                                ],
+                              ),
                             ),
-                          )
-                        )
+                          ),
+                        ),
+                        // Glassmorphic panel behind text for readability
+                        Positioned.fill(
+                          child: Center(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(16),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 8.0, sigmaY: 8.0),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.3),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.15),
+                                      width: 1.5,
+                                    ),
+                                  ),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        '${trips[index].tripName}',
+                                        style: const TextStyle(
+                                          fontSize: 24.0,
+                                          color: Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          shadows: [
+                                            Shadow(
+                                              offset: Offset(0, 1),
+                                              blurRadius: 4.0,
+                                              color: Colors.black45,
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      if (trips[index].designer != null && trips[index].designer!.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(top: 6.0),
+                                          child: Text(
+                                            'by:  ${trips[index].designer}',
+                                            style: TextStyle(
+                                              fontSize: 14.0,
+                                              color: Colors.white.withOpacity(0.85),
+                                              shadows: const [
+                                                Shadow(
+                                                  offset: Offset(0, 1),
+                                                  blurRadius: 2.0,
+                                                  color: Colors.black45,
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ]
                     ),
                   );
@@ -522,14 +762,26 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
           ],
         )
         :Center(
-          child: widget.netWorkIsOn 
-          ? const CircularProgressIndicator() 
-          : ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            icon: const Icon(Icons.refresh, color: Colors.white,),
-            label: const Text("点击刷新",style: TextStyle(color: Colors.white),),
-            onPressed: _refresh,
-          )
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("本地暂无行程数据", style: TextStyle(color: Colors.grey, fontSize: 16)),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                icon: const Icon(Icons.sync, color: Colors.white,),
+                label: const Text("去同步数据", style: TextStyle(color: Colors.white),),
+                onPressed: _showSyncDialog,
+              ),
+              const SizedBox(height: 12),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                icon: const Icon(Icons.add, color: Colors.white,),
+                label: const Text("新建行程", style: TextStyle(color: Colors.white),),
+                onPressed: _goToMapDesign,
+              ),
+            ],
+          ),
         )
       ),
       floatingActionButton: showBtn

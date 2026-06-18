@@ -93,7 +93,7 @@ class LastStepState extends State<LastStep> {
       });
       _controller8.text = '';
       widget.refresh();
-      Navigator.pushReplacementNamed(context, '/');
+      Navigator.popUntil(context, (route) => route.isFirst);
       Provider.of<UserData>(context, listen: false).setIndex([0,0]);
       Provider.of<UserData>(context, listen: false).setCloneData(TravelModel(detail: []));
     }catch(err){

@@ -64,26 +64,40 @@ class ArticleModel {
   });
 
   factory ArticleModel.fromJson(Map<String, dynamic> json) {
-    //print(555555);
-    // json.forEach((key, value) {
-    //   print('Key: $key, Value: $value');
-    // });
+    String getAbsoluteUrl(dynamic path) {
+      if (path == null) return '';
+      final String sPath = path.toString().trim();
+      if (sPath.isEmpty) return '';
+      if (sPath.startsWith('http://') || sPath.startsWith('https://')) {
+        return sPath;
+      }
+      return 'https://cdn.nextsticker.cn/$sPath';
+    }
+
     return ArticleModel(
-      articleName : json['articleName'],
-      picURL : json['picURL'],
-      videoURL : json['videoURL'] ?? '',
+      articleName : json['articleName'] ?? '',
+      picURL : getAbsoluteUrl(json['picURL']),
+      videoURL : getAbsoluteUrl(json['videoURL']),
       articleURL : json['articleURL'] ?? '',
-      width : json['width'],
-      height : json['height'],
+      width : json['width'] is String ? (num.tryParse(json['width']) ?? 0) : (json['width'] ?? 0),
+      height : json['height'] is String ? (num.tryParse(json['height']) ?? 0) : (json['height'] ?? 0),
       articleContent : json['articleContent'] ?? '',
       articleType : json['articleType'] ?? 1,
-      album : (json['album'] as List).map((i) => ReturnBody.fromJson(i)).toList(),
-      likes : (json['likes'] as List).map((i) => AuthModel.fromJson(i)).toList(),
-      collects : (json['collects'] as List).map((i) => AuthModel.fromJson(i)).toList(),
-      author : json['author'] != null ? AuthModel.fromJson(json['author']) : AuthModel(like: [], comment: [], collect: [], follow: [], followed: []),
-      comments : (json['comments'] as List).map((i) => Comment.fromJson(i)).toList(),
-      articleId: json["_id"],
-      createAt: json["createAt"],
+      album : json['album'] is List ? (json['album'] as List).map((i) {
+        if (i is Map<String, dynamic>) {
+          final Map<String, dynamic> updatedMap = Map<String, dynamic>.from(i);
+          updatedMap['key'] = getAbsoluteUrl(updatedMap['key']);
+          return ReturnBody.fromJson(updatedMap);
+        } else {
+          return ReturnBody.fromJson(i);
+        }
+      }).toList() : [],
+      likes : json['likes'] is List ? (json['likes'] as List).map((i) => i is Map<String, dynamic> ? AuthModel.fromJson(i) : AuthModel(uid: i.toString(), like: [], comment: [], collect: [], follow: [], followed: [])).toList() : [],
+      collects : json['collects'] is List ? (json['collects'] as List).map((i) => i is Map<String, dynamic> ? AuthModel.fromJson(i) : AuthModel(uid: i.toString(), like: [], comment: [], collect: [], follow: [], followed: [])).toList() : [],
+      author : json['author'] is Map<String, dynamic> ? AuthModel.fromJson(json['author']) : AuthModel(uid: json['author']?.toString() ?? '', like: [], comment: [], collect: [], follow: [], followed: []),
+      comments : json['comments'] is List ? (json['comments'] as List).map((i) => Comment.fromJson(i)).toList() : [],
+      articleId: json["_id"] ?? '',
+      createAt: json["createAt"] ?? '',
     );
   }
 

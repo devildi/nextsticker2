@@ -11,6 +11,7 @@ class ImageWithFallback extends StatefulWidget {
   final double picWidth;
   final double picHeight;
   final String name;
+  final BoxFit fit;
 
   const ImageWithFallback({
     Key? key,
@@ -20,6 +21,7 @@ class ImageWithFallback extends StatefulWidget {
     required this.width,
     required this.picWidth,
     required this.picHeight,
+    this.fit = BoxFit.cover,
   }) : super(key: key);
 
   @override
@@ -72,7 +74,9 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
 
   @override
   Widget build(BuildContext context) {
-    final double height = widget.width * widget.picHeight / widget.picWidth;
+    final double w = widget.picWidth <= 0 ? 100 : widget.picWidth;
+    final double h = widget.picHeight <= 0 ? 100 : widget.picHeight;
+    final double height = widget.width * h / w;
     return Container(
       decoration: const BoxDecoration(color: Colors.transparent),
       width: widget.width,
@@ -80,11 +84,21 @@ class ImageWithFallbackState extends State<ImageWithFallback> {
       child: localFileURL != ''
       ? Image.file(
           File(localFileURL),
-          fit: BoxFit.cover,
+          fit: widget.fit,
         )
-      : CachedNetworkImage(
-          imageUrl: widget.remoteURL,
-          fit: BoxFit.cover,
+      : (widget.remoteURL.isEmpty
+          ? Image.asset(
+              "assets/trip_fallback.png",
+              fit: widget.fit,
+            )
+          : CachedNetworkImage(
+              imageUrl: widget.remoteURL,
+              fit: widget.fit,
+              errorWidget: (context, url, error) => Image.asset(
+                "assets/trip_fallback.png",
+                fit: widget.fit,
+              ),
+            )
         ),
     );
   }

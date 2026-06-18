@@ -46,6 +46,7 @@ class MyPoState extends State<MyPo> {
   void initState() {
     super.initState();
     _controller.addListener(() {
+      if (!_controller.hasClients) return;
       if (_controller.position.pixels == _controller.position.maxScrollExtent) {
         if(widget.storys.length - pre == 20){
           _addMoreData(page);
@@ -58,6 +59,7 @@ class MyPoState extends State<MyPo> {
 
   @override
   void dispose() {
+    _controller.dispose();
     super.dispose();
   }
 
@@ -182,11 +184,30 @@ class _Item extends StatelessWidget {
                       color: randomColor(),
                     ),
                     width: MediaQuery.of(context).size.width / 2,
-                    height: (MediaQuery.of(context).size.width / 2) * storys[index].height / storys[index].width,
-                    child: CachedNetworkImage(
-                      imageUrl: storys[index].picURL,
-                      fit: BoxFit.cover,
-                    ),
+                    height: (() {
+                      final double w = double.tryParse(storys[index].width?.toString() ?? '') ?? 0.0;
+                      final double h = double.tryParse(storys[index].height?.toString() ?? '') ?? 0.0;
+                      if (w <= 0.0 || h <= 0.0) {
+                        return MediaQuery.of(context).size.width / 2; // Default to 1:1 square ratio
+                      }
+                      double ratio = h / w;
+                      if (ratio > 1.5) ratio = 1.5;
+                      if (ratio < 0.5) ratio = 0.5;
+                      return (MediaQuery.of(context).size.width / 2) * ratio;
+                    })(),
+                    child: storys[index].picURL.isEmpty
+                    ? Image.asset(
+                        "assets/trip_fallback.png",
+                        fit: BoxFit.cover,
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: storys[index].picURL,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Image.asset(
+                          "assets/trip_fallback.png",
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                   ),
                   //Picture(url: storys[index].picURL),
                   //Image.network(storys[index].picURL),
@@ -206,7 +227,15 @@ class _Item extends StatelessWidget {
                               height: 20,
                               width: 20,
                               margin: const EdgeInsets.fromLTRB(0, 0, 7, 3),
-                              child: storys[index].author?.avatar != '' ? ClipOval(child: Image.network(storys[index].author.avatar)) : ClipOval(child: Image.asset("assets/wechat.png")),
+                              child: storys[index].author?.avatar != '' 
+                                  ? ClipOval(
+                                      child: CachedNetworkImage(
+                                        imageUrl: storys[index].author.avatar,
+                                        fit: BoxFit.cover,
+                                        errorWidget: (context, url, error) => Image.asset("assets/wechat.png"),
+                                      ),
+                                    )
+                                  : ClipOval(child: Image.asset("assets/wechat.png")),
                             ),
                             storys[index].author != null && storys[index].author.name != null ? Text(storys[index].author.name) : const Text('DevilDI')
                           ],

@@ -11,8 +11,10 @@ import 'package:nextsticker2/model/travel_model.dart';
 import 'package:nextsticker2/dao/story_dao.dart';
 import 'package:nextsticker2/widgets/common_image.dart';
 import 'package:nextsticker2/tools/tools.dart';
+import 'package:nextsticker2/tools/sync_helper.dart';
 
 class Story extends StatefulWidget {
+  final bool isActive;
   final List storys;
   final Function onRefresh;
   final Function getMore;
@@ -27,6 +29,7 @@ class Story extends StatefulWidget {
   final Function initUserData;
   const Story({
     Key? key,
+    required this.isActive,
     required this.storys,
     required this.onRefresh, 
     required this.getMore,
@@ -44,13 +47,16 @@ class Story extends StatefulWidget {
   StoryState createState() => StoryState();
 }
 
-class StoryState extends State<Story> {
+class StoryState extends State<Story> with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
   final ScrollController _controller = ScrollController();
   int page = 2;
   int pre = 0;
   bool loading = false;
   bool showBtn = false;
   bool uploading = false;
+  int _gridVersion = 0;
   
   Future <void>_onRefresh() async{
     await widget.onRefresh();
@@ -161,9 +167,148 @@ class StoryState extends State<Story> {
     _controller.dispose();
   }
 
+  void Function(String)? _syncMessageUpdater;
+  void _updateSyncMessage(String msg) {
+    if (_syncMessageUpdater != null) {
+      _syncMessageUpdater!(msg);
+    }
+  }
+
+  void _showSyncDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('数据同步选项'),
+          content: const Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('请选择要执行的数据同步操作：\n(同步范围包含本地及服务器的行程与故事列表)'),
+              SizedBox(height: 10),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performSync(2); // 覆盖服务器
+              },
+              child: const Text('覆盖服务器数据'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _performSync(3); // 覆盖本地
+              },
+              child: const Text('覆盖本地数据'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('取消', style: TextStyle(color: Colors.grey)),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _performSync(int option) {
+    String progressMessage = '正在检查数据...';
+    _syncMessageUpdater = null; // 清空旧的回调
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            _syncMessageUpdater = (msg) {
+              setDialogState(() {
+                progressMessage = msg;
+              });
+            };
+            return AlertDialog(
+              content: Row(
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(width: 20),
+                  Expanded(
+                    child: Text(
+                      progressMessage,
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    Future.sync(() async {
+      // 等待 dialog 首帧渲染完成再开始异步操作
+      await Future.delayed(Duration.zero);
+      try {
+        // 0. 检查是否需要同步
+        _updateSyncMessage('正在检查数据差异...');
+        final bool syncNeeded = await SyncHelper.needsSync();
+        if (!syncNeeded) {
+          if (mounted) {
+            Navigator.of(context).pop();
+            _syncMessageUpdater = null;
+            widget.openSnackBar('数据已是最新，无需同步！', 2);
+          }
+          return;
+        }
+
+        _updateSyncMessage('正在初始化同步...');
+        // 1. Sync Trips
+        await SyncHelper.syncTrips(
+          option: option,
+          auth: widget.auth,
+          onProgress: (msg) {
+            _updateSyncMessage('[行程] $msg');
+          },
+        );
+
+        // 2. Sync Stories
+        await SyncHelper.syncStories(
+          option: option,
+          auth: widget.auth,
+          onProgress: (msg) {
+            _updateSyncMessage('[故事] $msg');
+          },
+        );
+
+        // 3. Refresh lists
+        _updateSyncMessage('正在刷新本地视图数据...');
+        setState(() {
+          pre = 0;
+          page = 2;
+          _gridVersion++;
+        });
+        await widget.initUserData(true);
+
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          _syncMessageUpdater = null;
+          widget.openSnackBar('数据同步成功！', 2);
+        }
+      } catch (e) {
+        debugPrint('Sync failed: $e');
+        if (mounted) {
+          Navigator.of(context).pop(); // Close loading dialog
+          widget.openSnackBar('同步失败: $e', 3);
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    //super.build(context);
+    super.build(context);
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blue,
@@ -171,8 +316,10 @@ class StoryState extends State<Story> {
         title: const Text('NextSticker', style: TextStyle(color: Colors.white)),
         centerTitle:true,
       ),
-      body: (widget.storys.isNotEmpty
-      ? Stack(
+      body: KeyedSubtree(
+        key: ValueKey('story_body_$_gridVersion'),
+        child: widget.storys.isNotEmpty
+        ? Stack(
         children: [
           RefreshIndicator(
             onRefresh: _onRefresh,
@@ -185,7 +332,7 @@ class StoryState extends State<Story> {
               itemBuilder: (context, index) {
                 return 
                   _Item(
-                    key: ValueKey(widget.storys[index].articleId),
+                    key: ValueKey('${widget.storys[index].articleId}_${widget.storys[index].picURL}_$index'),
                     index: index, 
                     storys: widget.storys,
                     platform: widget.platform,
@@ -206,17 +353,23 @@ class StoryState extends State<Story> {
         ],
       )
       : Center(
-          child: widget.netWorkIsOn 
-          ? const CircularProgressIndicator() 
-          : ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-            icon: const Icon(Icons.refresh, color: Colors.white,),
-            label: const Text("点击刷新",style: TextStyle(color: Colors.white),),
-            onPressed: _refresh,
-          )
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text("本地暂无故事数据", style: TextStyle(color: Colors.grey, fontSize: 16)),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+                icon: const Icon(Icons.sync, color: Colors.white,),
+                label: const Text("去同步数据", style: TextStyle(color: Colors.white),),
+                onPressed: _showSyncDialog,
+              ),
+            ],
+          ),
         )
       ),
       floatingActionButton: MyAnimateEdit(
+        isActive: widget.isActive,
         openSnackBar: widget.openSnackBar,
         auth: widget.auth.uid,
         platform: widget.platform,
@@ -297,10 +450,14 @@ class _Item extends StatelessWidget {
                 TextButton(
                   child: const Text('确定'),
                   onPressed: () async{
+                    final bool isOnline = Provider.of<UserData>(context, listen: false).netWorkStatus;
                     if(storys[index].articleType == 3){
                       try {
+                        if (isOnline) {
+                          await StoryDao.deleteStoryOnServer(storys[index].articleId, [storys[index].videoURL, storys[index].picURL]);
+                        }
                         await StoryDao.deleteStory(storys[index].articleId, [storys[index].videoURL, storys[index].picURL]);
-                        await CommonUtils.deleteLocalFilesAsync([CommonUtils.removeBaseUrl(storys[index].picURL), CommonUtils.removeBaseUrl(storys[index].videoURL)]);
+                        await CommonUtils.deleteLocalFilesAsync([CommonUtils.removeBaseUrl(storys[index].picURL), CommonUtils.removeBaseUrl(storys[index].videoURL)], hasVideo: true);
                         initUserData(true);
                         openSnackBar('已删除！', 1);
                         if (!context.mounted) return;
@@ -311,6 +468,9 @@ class _Item extends StatelessWidget {
                       }
                     } else if(storys[index].articleType == 2) {
                        try {
+                        if (isOnline) {
+                          await StoryDao.deleteStoryOnServer(storys[index].articleId, storys[index].album.map((e) => e.key).toList());
+                        }
                         await StoryDao.deleteStory(storys[index].articleId, storys[index].album.map((e) => e.key).toList());
                         await CommonUtils.deleteLocalFilesAsync(storys[index].album.map<String>((e) => CommonUtils.removeBaseUrl(e.key.toString())).toList());
                         initUserData(true);
@@ -344,20 +504,40 @@ class _Item extends StatelessWidget {
                     color: CommonUtils.randomColor(),
                   ),
                   width: MediaQuery.of(context).size.width / 2,
-                  height: (MediaQuery.of(context).size.width / 2) * storys[index].height / storys[index].width,
-                  child: storys[index].articleType != null && storys[index].articleType == 2 || storys[index].articleType == 3
-                  ?ImageWithFallback(
-                    remoteURL: storys[index].picURL,
-                    resourceId: CommonUtils.removeBaseUrl(storys[index].picURL),
-                    width: storys[index].width.toDouble(),
-                    picWidth: storys[index].width.toDouble(),
-                    picHeight: storys[index].height.toDouble(),
-                    name: storys[index].articleName
-                  )
-                  :CachedNetworkImage(
-                    imageUrl: storys[index].picURL,
-                    fit: BoxFit.cover,
-                  ),
+                  height: (() {
+                    final double w = double.tryParse(storys[index].width?.toString() ?? '') ?? 0.0;
+                    final double h = double.tryParse(storys[index].height?.toString() ?? '') ?? 0.0;
+                    if (w <= 0.0 || h <= 0.0) {
+                      return MediaQuery.of(context).size.width / 2; // Default to 1:1 square ratio
+                    }
+                    double ratio = h / w;
+                    if (ratio > 1.5) ratio = 1.5;
+                    if (ratio < 0.5) ratio = 0.5;
+                    return (MediaQuery.of(context).size.width / 2) * ratio;
+                  })(),
+                  child: storys[index].picURL.isEmpty
+                  ? Image.asset(
+                      "assets/trip_fallback.png",
+                      fit: BoxFit.cover,
+                    )
+                  : (storys[index].articleType != null && storys[index].articleType == 2 || storys[index].articleType == 3
+                      ? ImageWithFallback(
+                          remoteURL: storys[index].picURL,
+                          resourceId: CommonUtils.removeBaseUrl(storys[index].picURL),
+                          width: MediaQuery.of(context).size.width / 2,
+                          picWidth: double.tryParse(storys[index].width?.toString() ?? '') ?? 100.0,
+                          picHeight: double.tryParse(storys[index].height?.toString() ?? '') ?? 100.0,
+                          name: storys[index].articleName,
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: storys[index].picURL,
+                          fit: BoxFit.cover,
+                          errorWidget: (context, url, error) => Image.asset(
+                            "assets/trip_fallback.png",
+                            fit: BoxFit.cover,
+                          ),
+                        )
+                    ),
                 ),
                 Container(
                   padding: const EdgeInsets.all(7),
@@ -375,7 +555,15 @@ class _Item extends StatelessWidget {
                             height: 20,
                             width: 20,
                             margin: const EdgeInsets.fromLTRB(0, 0, 7, 3),
-                            child: storys[index].author?.avatar != '' ? ClipOval(child: Image.network(storys[index].author.avatar)) : ClipOval(child: Image.asset("assets/wechat.png")),
+                            child: storys[index].author?.avatar != '' 
+                                ? ClipOval(
+                                    child: CachedNetworkImage(
+                                      imageUrl: storys[index].author.avatar,
+                                      fit: BoxFit.cover,
+                                      errorWidget: (context, url, error) => Image.asset("assets/wechat.png"),
+                                    ),
+                                  )
+                                : ClipOval(child: Image.asset("assets/wechat.png")),
                           ),
                           storys[index].author != null && storys[index].author.name != '' ? Text(storys[index].author.name) : const Text('DevilDI', style: TextStyle(color: Colors.black),)
                         ],

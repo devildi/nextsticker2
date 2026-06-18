@@ -32,8 +32,8 @@ import 'package:animated_text_kit/animated_text_kit.dart';
 import 'package:nextsticker2/widgets/queue.dart';
 import 'package:nextsticker2/tools/tools.dart';
 //websocket请求格式：'http://localhost:4000/socket.io/?EIO=4&transport=polling&t=OIUQBge'
-//const wsURL = 'ws://localhost:4000';
-const wsURL = 'wss://nextsticker.cn';
+//const wsURL = 'ws://10.214.72.50:4000';
+//const wsURL = 'wss://nextsticker.cn';
 
 void main() async{
   WidgetsFlutterBinding.ensureInitialized();
@@ -143,6 +143,8 @@ class _MyHomePageState extends State<MyHomePage> {
   List tripList = [];
   int _selectedIndex = 0;
   //int _modalIndex = 0;
+
+  DateTime _lastPopupOpenTime = DateTime.now();
 
   List storyListAuthor = [];
   List storyListLikes = [];
@@ -264,7 +266,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState(){
     super.initState();
-    socket = io.io(wsURL, <String, dynamic>{
+    socket = io.io(CommonUtils.developmentMode ? CommonUtils.wsLan : 'wss://nextsticker.cn', <String, dynamic>{
         'transports': ['websocket'],
     }); 
     socket.on('connect', (_) {
@@ -289,8 +291,18 @@ class _MyHomePageState extends State<MyHomePage> {
 
     platform.setMethodCallHandler((call) async{
       switch (call.method) {
+        case 'mapResumed':
+          if (!context.mounted) return;
+          TravelModel userData = Provider.of<UserData>(context, listen: false).userData;
+          inJectToIOS(userData);
+          int index = mapKey.currentState?.currentIndex ?? 0;
+          platform.invokeMethod('changeCenter', index.toString());
+          break;
         case 'openBottomSheet':
           dynamic content = await call.arguments;
+          if (DateTime.now().difference(_lastPopupOpenTime).inMilliseconds < 400) {
+            break;
+          }
           if (!context.mounted) return;
           openBottomSheet(context, content);
           break;
@@ -437,13 +449,37 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  Future <void> openBottomSheet(context, string) async{
+  Future <void> openBottomSheet(context, dynamic input) async{
     TravelModel userData = Provider.of<UserData>(context, listen: false).userData;
     List allPoints = flatData(userData.detail);
-    int index = allPoints.indexWhere((element) => element.nameOfScence == string);
+    int index = -1;
+    String name = '';
+    List points = [];
+    
+    if (input is int) {
+      index = input;
+      if (index >= 0 && index < allPoints.length) {
+        name = allPoints[index].nameOfScence;
+        points = [allPoints[index]];
+      }
+    } else if (input is DetailModel) {
+      index = allPoints.indexOf(input);
+      name = input.nameOfScence;
+      points = [input];
+    } else if (input is String) {
+      name = input;
+      index = allPoints.indexWhere((element) => element.nameOfScence == name);
+      if (index != -1) {
+        points = [allPoints[index]];
+      }
+    }
+
+    if (index == -1) return;
+
+    _lastPopupOpenTime = DateTime.now();
+
     mapKey.currentState?.changePoint(index);
-    platform.invokeMethod('setDestination',string);
-    List points = allPoints.where((element) => element.nameOfScence == string).toList();
+    platform.invokeMethod('setDestination', index);
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -465,23 +501,85 @@ class _MyHomePageState extends State<MyHomePage> {
                   topLeft: Radius.circular(20.0),
                   topRight: Radius.circular(20.0),
                 ),
-                child: CachedNetworkImage(
+                child: SafeNetworkImage(
                   imageUrl: points[0].picURL,
                   width: MediaQuery.of(context).size.width,
                   fit: BoxFit.cover,
-                  fadeInDuration: const Duration(),
                 ),
               )
               :Container(),
               Padding(
-                padding: const EdgeInsets.all(3.0),
+                padding: EdgeInsets.fromLTRB(10.0, 10.0, 10.0, 15.0 + MediaQuery.of(context).padding.bottom),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Text(points[0].nameOfScence, style: const TextStyle(fontSize: 25.0)),
+                        Expanded(
+                          child: Text(
+                            points[0].nameOfScence,
+                            style: const TextStyle(fontSize: 25.0),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            GestureDetector(
+                              onTap: () async {
+                                try {
+                                  await platform.invokeMethod('navigetGoogle', 'bus');
+                                } catch (e) {
+                                  debugPrint('跳转谷歌地图失败: $e');
+                                  if (context.mounted) {
+                                    _openSnackBar('跳转谷歌地图失败: $e', 3);
+                                  }
+                                }
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              child: ClipOval(
+                                child: Image.asset(
+                                  "assets/google.png",
+                                  width: 35,
+                                  height: 35,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              height: 25,
+                              width: 1,
+                              color: Colors.grey.withOpacity(0.5),
+                              margin: const EdgeInsets.symmetric(horizontal: 10),
+                            ),
+                            GestureDetector(
+                              onTap: () async {
+                                try {
+                                  await platform.invokeMethod('navigetGaode', 'bus');
+                                } catch (e) {
+                                  debugPrint('跳转高德地图失败: $e');
+                                  if (context.mounted) {
+                                    _openSnackBar('跳转高德地图失败: $e', 3);
+                                  }
+                                }
+                                if (context.mounted) {
+                                  Navigator.pop(context);
+                                }
+                              },
+                              child: ClipOval(
+                                child: Image.asset(
+                                  "assets/gaode.png",
+                                  width: 35,
+                                  height: 35,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
                     points[0].des.isNotEmpty
@@ -490,18 +588,6 @@ class _MyHomePageState extends State<MyHomePage> {
                   ],
                 ),
               ),
-              Padding(
-                padding: EdgeInsets.fromLTRB(3, 3, 3, MediaQuery.of(context).padding.bottom),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    clickwhich(const Icon(Icons.directions_bus,size: 30.0),'bus', context),
-                    clickwhich(const Icon(Icons.directions_walk,size: 30.0),'walk', context),
-                    clickwhich(const Icon(Icons.directions_bike,size: 30.0),'bike', context),
-                    clickwhich(const Icon(Icons.directions_car,size: 30.0),'car', context)
-                  ],
-                )
-              )
             ],
           )
         );
@@ -519,21 +605,7 @@ class _MyHomePageState extends State<MyHomePage> {
     }
     Provider.of<UserData>(context, listen: false).setTrips(newTripList);
   }
-  Widget clickwhich(icon, string, ctx){
-    num domestic = Provider.of<UserData>(context, listen: false).userData.domestic;
-    
-    return GestureDetector(
-      child:icon,
-      onTap: (){
-        if(domestic == 1){
-          platform.invokeMethod('genRoute', string);
-        } else {
-          platform.invokeMethod('toGoogleMapApp', string);
-        }
-        Navigator.pop(ctx);  
-      }
-    );
-  }
+
 
   bool _pop(bool? check){
     Provider.of<UserData>(context, listen: false).setPicsFromAlbum([]);
@@ -592,6 +664,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (!context.mounted) return;
       Provider.of<UserData>(context, listen: false).setCloneData(cloneTrip);
       Provider.of<UserData>(context, listen: false).setPoints([]);
+      Provider.of<UserData>(context, listen: false).addProcessingName(item.nameOfScence);
       platform.invokeMethod('clear');
       //添加异步队列
       queue.addTask(
@@ -623,6 +696,9 @@ class _MyHomePageState extends State<MyHomePage> {
             updateListItem(updatedTrip);
             debugPrint('已在【后台】完善${item.nameOfScence}的图片和描述');
           }
+        }
+        if (context.mounted) {
+          Provider.of<UserData>(context, listen: false).removeProcessingName(item.nameOfScence);
         }
       });
       _openSnackBar('已添加第${location[0] + 1}天第${cloneTrip.detail[location[0]].dayList.length}个点', 1);
@@ -759,12 +835,10 @@ class _MyHomePageState extends State<MyHomePage> {
                         tripItem.picURL !='' || userData.picBing != '' 
                         ?GestureDetector(
                           onTap: fetchIMG,
-                          child: CachedNetworkImage(
+                          child: SafeNetworkImage(
                             imageUrl: userData.picBing != '' ? userData.picBing : tripItem.picURL,
                             fit: BoxFit.cover,
                             height: 150,
-                            //placeholder: (context, url) => const CircularProgressIndicator(), // 加载中的占位符
-                            errorWidget: (context, url, error) => const Icon(Icons.error),
                           ),
                         )
                         :Container(),
@@ -998,10 +1072,8 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void inJectToIOS(userData){
-    //print('--------${flatData(userData.detail).length}');
-    dynamic jsonArray = flatData(userData.detail).map((i) => json.encode(i)).toList();
-    String string = jsonArray.toString();
-    platform.invokeMethod('InjectData',string);
+    String string = json.encode(flatData(userData.detail).map((i) => i.toJson()).toList());
+    platform.invokeMethod('InjectData', string);
   }
 
   List hotelData(array){
@@ -1074,11 +1146,14 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void _handleNavigationTap(int index) {
-    if (index == 2) {
-      storyKey.currentState?.toTop();
-    } else if (index == 1 && tripList.isNotEmpty) {
-      listKey.currentState?.toTop();
-    } else if (index == 0) {
+    if (index == _selectedIndex) {
+      if (index == 2) {
+        storyKey.currentState?.toTop();
+      } else if (index == 1 && tripList.isNotEmpty) {
+        listKey.currentState?.toTop();
+      }
+    }
+    if (index == 0) {
       platform.invokeMethod('startLoaction');
     }
   }
@@ -1240,7 +1315,11 @@ class _MyHomePageState extends State<MyHomePage> {
       ?Scaffold(
         key: _scaffoldKey,
         body: PageView(
-          onPageChanged: _onItemTapped,
+          onPageChanged: (index) {
+            setState(() {
+              _selectedIndex = index;
+            });
+          },
           controller: _pageController,
           physics: const NeverScrollableScrollPhysics(),
           children: <Widget>[
@@ -1248,9 +1327,9 @@ class _MyHomePageState extends State<MyHomePage> {
               key: mapKey,
               domestic: inChina,
               openSnackBar: _openSnackBar, 
-              points: flatData(userData.detail).map((i) => json.encode(i)).toList().toString(),
-              hotelPoints: hotelData(flatData(userData.detail)).map((i) => json.encode(i)).toList().toString(),
-              foodPoints: foodData(flatData(userData.detail)).map((i) => json.encode(i)).toList().toString(),
+              points: json.encode(flatData(userData.detail).map((i) => i.toJson()).toList()),
+              hotelPoints: json.encode(hotelData(flatData(userData.detail)).map((i) => i.toJson()).toList()),
+              foodPoints: json.encode(foodData(flatData(userData.detail)).map((i) => i.toJson()).toList()),
               platform: platform,
               userData: userData,
               showMyDialog: _showMyDialog,
@@ -1275,9 +1354,11 @@ class _MyHomePageState extends State<MyHomePage> {
               reFresh: _reFresh,
               platform: platform,
               updateListItem: updateListItem,
+              initUserData: initUserData,
             ),
             Story(
               key: storyKey,
+              isActive: _selectedIndex == 2,
               storys: storyList, 
               onRefresh: _onRefreshStory, 
               getMore: _addMoreData,
@@ -1339,5 +1420,53 @@ class _MyHomePageState extends State<MyHomePage> {
           getData: getDataWithState
         )
       );
+  }
+}
+
+class SafeNetworkImage extends StatefulWidget {
+  final String imageUrl;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+
+  const SafeNetworkImage({
+    Key? key,
+    required this.imageUrl,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+  }) : super(key: key);
+
+  @override
+  _SafeNetworkImageState createState() => _SafeNetworkImageState();
+}
+
+class _SafeNetworkImageState extends State<SafeNetworkImage> {
+  bool _hasError = false;
+
+  @override
+  Widget build(BuildContext context) {
+    if (_hasError || widget.imageUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return CachedNetworkImage(
+      imageUrl: widget.imageUrl,
+      width: widget.width,
+      height: widget.height,
+      fit: widget.fit,
+      fadeInDuration: const Duration(milliseconds: 200),
+      errorWidget: (context, url, error) {
+        if (!_hasError) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+              });
+            }
+          });
+        }
+        return const SizedBox.shrink();
+      },
+    );
   }
 }

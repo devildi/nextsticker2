@@ -32,10 +32,30 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
   // Track progress for each file index
   Map<int, double> progressMap = {};
 
+  bool _initialized = false;
+
   @override
   void initState() {
     super.initState();
     init();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final dynamic data = ModalRoute.of(context)?.settings.arguments;
+      if (data != null && data["initialMedias"] != null) {
+        final List<dynamic> initMedias = data["initialMedias"];
+        setState(() {
+          medias = initMedias.map((e) {
+            if (e is XFile) return e;
+            return XFile(e.path);
+          }).toList();
+        });
+      }
+      _initialized = true;
+    }
   }
 
   void init()async{
@@ -152,13 +172,34 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
   }
 
   Future _add() async {
-    final ImagePicker picker = ImagePicker();
-    final List<XFile> res = await picker.pickMultiImage();
-    
-    if(res.isNotEmpty){
-      setState(() {
-        medias.addAll(res);
-      });
+    try {
+      final ImagePicker picker = ImagePicker();
+      final List<XFile> res = await picker.pickMultiImage();
+      
+      if (res.isNotEmpty) {
+        int currentLength = medias.length;
+        int remaining = 5 - currentLength;
+        if (remaining <= 0) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.blue, content: Text('最多只能添加5张照片', textAlign: TextAlign.center)),
+          );
+          return;
+        }
+        
+        List<XFile> toAdd = res;
+        if (res.length > remaining) {
+          toAdd = res.sublist(0, remaining);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(backgroundColor: Colors.blue, content: Text('最多只能添加5张照片，超出部分已自动裁切', textAlign: TextAlign.center)),
+          );
+        }
+        
+        setState(() {
+          medias.addAll(toAdd);
+        });
+      }
+    } catch (e) {
+      debugPrint("EditMicro pickMultiImage error: $e");
     }
   }
 
@@ -336,7 +377,7 @@ class EditMicroState extends State<EditMicro> with AutomaticKeepAliveClientMixin
           ),
           TextButton(
             onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(openSnackBar, medias, uid, initUserData)),
-            child: Text('发布', style: TextStyle(color: (medias.isEmpty || title == '' || content == '' ?Colors.grey: Colors.black))),
+            child: Text('发布', style: TextStyle(color: (medias.isEmpty || title == '' || content == '' || uploading ? Colors.grey : Colors.black))),
           )
         ]
       ),

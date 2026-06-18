@@ -6,6 +6,7 @@ import 'package:nextsticker2/store/store.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter/foundation.dart';
 import 'package:card_swiper/card_swiper.dart';
+import 'package:nextsticker2/tools/tools.dart';
 
 class GaodeMap extends StatefulWidget {
   final String points;
@@ -58,14 +59,16 @@ class GaodeMapState extends State<GaodeMap> with AutomaticKeepAliveClientMixin
   GlobalKey<GaodeMapState> gaodeKey = GlobalKey();
   late SwiperController _swiperController;
   int currentIndex = 0;
+  bool _isMovingProgrammatically = false;
 
   Widget genLeading(){
     if(widget.userData.uid == ''){
       return Container();
     } else {
-      return GestureDetector(child: const Icon(Icons.expand_more, color: Colors.white),onTap: (){
-        openBottomSheet1(context);     
-      });
+      return GestureDetector(
+        onTap: testXianyu,
+        child: const Icon(Icons.assignment, color: Colors.white),
+      );
     }
   }
 
@@ -239,6 +242,21 @@ class GaodeMapState extends State<GaodeMap> with AutomaticKeepAliveClientMixin
   }
 
   @override
+  void didUpdateWidget(GaodeMap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.points != oldWidget.points) {
+      setState(() {
+        currentIndex = 0;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _swiperController.move(0, animation: false);
+        }
+      });
+    }
+  }
+
+  @override
   void dispose(){
     _swiperController.dispose();
     super.dispose();
@@ -256,21 +274,37 @@ class GaodeMapState extends State<GaodeMap> with AutomaticKeepAliveClientMixin
     });
   }
 
-  void changePoint(int index){
-    setState(() {
-      currentIndex = index;
-    });
-    _swiperController.move(index);
+  void changePoint(int index, {bool fromSwiper = false}){
+    if (currentIndex != index) {
+      setState(() {
+        currentIndex = index;
+      });
+      if (!fromSwiper) {
+        _isMovingProgrammatically = true;
+        _swiperController.move(index);
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted) {
+            _isMovingProgrammatically = false;
+          }
+        });
+      }
+    }
     widget.platform.invokeMethod('changeCenter', index.toString());
   }
 
-  void tapBar(int index){
-    _swiperController.move(index);
-    widget.platform.invokeMethod('changeCenter', index.toString());
+  void tapBar(int index, DetailModel item){
+    changePoint(index, fromSwiper: false);
+    widget.openBottomSheet(context, item);
   }
 
   void testXianyu()async{
-    
+    CommonUtils.showTripOverviewDialog(
+      context,
+      widget.userData,
+      onDelete: () {
+        widget.showMyDialog(context, 1);
+      },
+    );
   }
 
   @override
@@ -286,12 +320,9 @@ class GaodeMapState extends State<GaodeMap> with AutomaticKeepAliveClientMixin
         backgroundColor: Colors.blue,
         leading: genLeading(),
         centerTitle:true,
-        title: GestureDetector(
-          onTap: testXianyu,
-          child: const Text(
-            'NextSticker',
-            style: TextStyle(color: Colors.white),
-          ),
+        title: const Text(
+          'NextSticker',
+          style: TextStyle(color: Colors.white),
         ),
         actions: <Widget>[
           widget.userData.uid == ''
@@ -342,51 +373,96 @@ class GaodeMapState extends State<GaodeMap> with AutomaticKeepAliveClientMixin
             child: SizedBox(
               height: 50, // 保持Swiper高度不变
               child: Swiper(
+                index: currentIndex,
                 controller: _swiperController,
                 itemCount: pointsArray.length,
                 itemBuilder: (context, index) {
                   return GestureDetector(
-                    onTap: () => tapBar(index),
+                    onTap: () => tapBar(index, pointsArray[index]),
                     child: Container(
                       width: 200,
                       height: 50, // GestureDetector高度为50
                       color: Colors.grey[200],
                       alignment: Alignment.center,
-                      child:  Row(
-                      mainAxisSize: MainAxisSize.min, // 让 Row 仅占用所需空间
-                      children: [
-                        const SizedBox(width: 10),
-                        Text(
-                          '${currentIndex + 1}：',
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                      child: Row(
+                        children: [
+                          const SizedBox(width: 10),
+                          Text(
+                            '${index + 1}：',
+                            style: const TextStyle(
+                              color: Colors.black87,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        pointsArray[currentIndex].picURL != '' || pointsArray[currentIndex].picURL.isNotEmpty
-                        ?CircleAvatar(
-                          radius: 20,
-                          backgroundImage: NetworkImage(pointsArray[currentIndex].picURL), 
-                        )
-                        :Container(),
-                        const SizedBox(width: 10),
-                        Text(
-                          pointsArray[currentIndex].nameOfScence,
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(width: 10),
+                          pointsArray[index].picURL != '' && pointsArray[index].picURL.isNotEmpty
+                          ?CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.transparent,
+                            child: ClipOval(
+                              child: Image.network(
+                                pointsArray[index].picURL,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Transform.scale(
+                                    scale: 1.6,
+                                    child: Image.asset(
+                                      "assets/logo.png",
+                                      width: 40,
+                                      height: 40,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          )
+                          :CircleAvatar(
+                            radius: 20,
+                            backgroundColor: Colors.transparent,
+                            child: ClipOval(
+                              child: Transform.scale(
+                                scale: 1.6,
+                                child: Image.asset(
+                                  "assets/logo.png",
+                                  width: 40,
+                                  height: 40,
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(width: 10), // 间距
-                      ],
-                    )
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              pointsArray[index].nameOfScence,
+                              style: const TextStyle(
+                                color: Colors.black87,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          ),
+                          const SizedBox(width: 10), // 间距
+                        ],
+                      )
                     ),
                   );
                 },
-                onIndexChanged: (index) => changePoint(index),
+                onIndexChanged: (index) {
+                  if (_isMovingProgrammatically) {
+                    if (index == currentIndex) {
+                      _isMovingProgrammatically = false;
+                    }
+                    return;
+                  }
+                  changePoint(index, fromSwiper: true);
+                },
                 loop: false,
                 scrollDirection: Axis.horizontal,
                 control: const SwiperControl(),

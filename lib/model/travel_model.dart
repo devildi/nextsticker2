@@ -37,9 +37,10 @@ class Comment {
 
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      content: json["content"],
-      whoseContent: AuthModel.fromJson(json["whoseContent"]),
-      //whichArticle: json["whichArticle"],
+      content: json["content"] ?? '',
+      whoseContent: json["whoseContent"] is Map<String, dynamic> 
+          ? AuthModel.fromJson(json["whoseContent"]) 
+          : AuthModel(uid: json["whoseContent"]?.toString() ?? '', like: [], comment: [], collect: [], follow: [], followed: []),
     );
   }
 
@@ -115,9 +116,9 @@ class ReturnBody {
 
   factory ReturnBody.fromJson(Map<String, dynamic> json) {
     return ReturnBody(
-      width: json["width"],
-      height: json["height"],
-      key: json["key"],
+      width: json["width"]?.toString() ?? '0',
+      height: json["height"]?.toString() ?? '0',
+      key: json["key"] ?? '',
       mimeType: json["mimeType"] ?? '' ,
     );
   }
@@ -155,14 +156,14 @@ class AuthModel {
 
   factory AuthModel.fromJson(Map<String, dynamic> json) {
     return AuthModel(
-      name: json["name"],
-      uid: json["_id"],
+      name: json["name"] ?? '',
+      uid: json["_id"] ?? json["uid"] ?? '',
       avatar: json["avatar"] ?? '',
-      like: json['like'].length > 0 ? (json['like'] as List).map((i) => ArticleModel.fromJson(i)).toList() : [],
-      comment: json['comment'].length > 0 ?(json['comment'] as List).map((i) => ArticleModel.fromJson(i)).toList(): [],
-      collect: json['collect'].length > 0 ?(json['collect'] as List).map((i) => ArticleModel.fromJson(i)).toList(): [],
-      follow: json['follow'].length > 0 ?(json['follow'] as List).map((i) => AuthModel.fromJson(i)).toList(): [],
-      followed: json['followed'].length > 0 ?(json['followed'] as List).map((i) => AuthModel.fromJson(i)).toList(): [],
+      like: json['like'] is List ? (json['like'] as List).map((i) => i is Map<String, dynamic> ? ArticleModel.fromJson(i) : ArticleModel(album: [], author: AuthModel(like: [], comment: [], collect: [], follow: [], followed: []), likes: [], comments: [], collects: [], articleId: i.toString())).toList() : [],
+      comment: json['comment'] is List ? (json['comment'] as List).map((i) => i is Map<String, dynamic> ? ArticleModel.fromJson(i) : ArticleModel(album: [], author: AuthModel(like: [], comment: [], collect: [], follow: [], followed: []), likes: [], comments: [], collects: [], articleId: i.toString())).toList() : [],
+      collect: json['collect'] is List ? (json['collect'] as List).map((i) => i is Map<String, dynamic> ? ArticleModel.fromJson(i) : ArticleModel(album: [], author: AuthModel(like: [], comment: [], collect: [], follow: [], followed: []), likes: [], comments: [], collects: [], articleId: i.toString())).toList() : [],
+      follow: json['follow'] is List ? (json['follow'] as List).map((i) => i is Map<String, dynamic> ? AuthModel.fromJson(i) : AuthModel(uid: i.toString(), like: [], comment: [], collect: [], follow: [], followed: [])).toList() : [],
+      followed: json['followed'] is List ? (json['followed'] as List).map((i) => i is Map<String, dynamic> ? AuthModel.fromJson(i) : AuthModel(uid: i.toString(), like: [], comment: [], collect: [], follow: [], followed: [])).toList() : [],
     );
   }
 
@@ -237,9 +238,9 @@ class DetailModel {
 
   factory DetailModel.fromJson(Map<String, dynamic> json) {
     return DetailModel(
-      nameOfScence: json["nameOfScence"],
-      longitude: json["longitude"].toString(),
-      latitude: json["latitude"].toString(),
+      nameOfScence: json["nameOfScence"] ?? '',
+      longitude: json["longitude"]?.toString() ?? '',
+      latitude: json["latitude"]?.toString() ?? '',
       des: json["des"] ?? '',
       picURL: json["picURL"] ?? '',
       pointOrNot: json["pointOrNot"] ?? true,
@@ -294,7 +295,7 @@ class TravelModel {
   String city;
   String country;
   String tags;
-  final String cover;
+  String cover;
   final num domestic;
   List<DayDetail> detail;
 
@@ -336,7 +337,7 @@ class TravelModel {
       country: json["country"] ?? '',
       tags: json["tags"] ?? '',
       cover: json["cover"] ?? '',
-      detail: (json["detail"] as List).map((i) => DayDetail.fromJson(i)).toList()
+      detail: json["detail"] is List ? (json["detail"] as List).map((i) => DayDetail.fromJson(i)).toList() : []
     );
   }
 

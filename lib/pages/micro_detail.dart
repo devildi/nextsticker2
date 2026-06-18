@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 //import 'package:flutter_swiper/flutter_swiper.dart';
 import 'package:card_swiper/card_swiper.dart';
 import 'dart:math';
-//import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:nextsticker2/model/article_model.dart';
 import 'package:video_player/video_player.dart';
 import 'package:nextsticker2/dao/story_dao.dart';
@@ -47,6 +47,8 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
   bool isReady = false;
   String? localVideoPath;
   late ArticleModel item;
+  CancelToken? _downloadCancelToken;
+  bool _isLocalPlayer = false;
 
   final TextEditingController _textController = TextEditingController();
   ScrollController controller1 = ScrollController();
@@ -67,21 +69,57 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
     final url = widget.articleFromStoryPage.videoURL == '' ? 'https://cdn.moji.com/websrc/video/video621.mp4' : widget.articleFromStoryPage.videoURL;
     if(type == 3){
       final resourceId = CommonUtils.removeBaseUrl(url);
+      final savePath = await CommonUtils.getLocalURLForResource(resourceId, isImg: false);
+      
+      bool playLocalSuccess = false;
+      
       if (await CommonUtils.isFileExist(resourceId, isImg: false)) {
         File file = await CommonUtils.getLocalFileForResource(resourceId, isImg: false);
-        _controller = VideoPlayerController.file(file);
-        debugPrint('${widget.articleFromStoryPage.articleName}的本地视频存在，直接使用');
+        if (await file.exists() && await file.length() > 0) {
+          try {
+            _controller = VideoPlayerController.file(file);
+            await _controller.initialize();
+            playLocalSuccess = true;
+            _isLocalPlayer = true;
+            debugPrint('${widget.articleFromStoryPage.articleName}的本地视频存在且初始化成功，直接使用');
+          } catch (e) {
+            debugPrint('初始化本地视频失败，删除此损坏的文件: $e');
+            try {
+              if (await file.exists()) {
+                await file.delete();
+              }
+            } catch (err) {
+              debugPrint('删除损坏的本地视频失败: $err');
+            }
+          }
+        }
+      }
+      
+      if (playLocalSuccess) {
+        if (mounted) {
+          setState(() {
+            isReady = true;
+          });
+          _controller.play();
+          _controller.setLooping(true);
+        }
       } else {
         _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-        _downloadAndSave(url, await CommonUtils.getLocalURLForResource(resourceId, isImg: false));
-        debugPrint('${widget.articleFromStoryPage.articleName}不存在，后台下载');
+        _downloadAndSave(url, savePath);
+        debugPrint('${widget.articleFromStoryPage.articleName}本地视频不存在或损坏，使用网络播放并下载');
+        try {
+          await _controller.initialize();
+        } catch (e) {
+          debugPrint('初始化网络视频失败: $e');
+        }
+        if (mounted && !_isLocalPlayer) {
+          setState(() {
+            isReady = true;
+          });
+          _controller.play();
+          _controller.setLooping(true);
+        }
       }
-      await _controller.initialize();
-      setState(() {
-        isReady = true;
-      });
-      _controller.play();
-      _controller.setLooping(true);
     } else {
       _controller = VideoPlayerController.networkUrl(Uri.parse(url));
     }
@@ -97,23 +135,99 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
   }
 
   Future<void> _downloadAndSave(String url, String savePath) async {
+    final tempPath = '$savePath.tmp';
+    _downloadCancelToken = CancelToken();
     try {
       Dio dio = Dio();
       await dio.download(
         url,
-        savePath,
+        tempPath,
+        cancelToken: _downloadCancelToken,
         onReceiveProgress: (received, total) {
           if (total != -1) {
             debugPrint("下载进度: ${(received / total * 100).toStringAsFixed(0)}%");
-            setState(() {
-              progress = received / total;
-            });
+            if (mounted) {
+              setState(() {
+                progress = received / total;
+              });
+            }
           }
         },
       );
-      debugPrint("视频已缓存到: $savePath");
+      // Rename temporary file to final path on success
+      final tempFile = File(tempPath);
+      if (await tempFile.exists()) {
+        await tempFile.rename(savePath);
+        debugPrint("视频已成功下载并重命名为: $savePath");
+        await _switchToLocalPlayer(savePath);
+      }
     } catch (e) {
       debugPrint("下载视频失败: $e");
+      // Clean up the temp file if it exists
+      try {
+        final tempFile = File(tempPath);
+        if (await tempFile.exists()) {
+          await tempFile.delete();
+          debugPrint("已清理下载失败的临时残留视频文件");
+        }
+      } catch (err) {
+        debugPrint("清理临时残留视频文件失败: $err");
+      }
+    } finally {
+      _downloadCancelToken = null;
+    }
+  }
+
+  Future<void> _switchToLocalPlayer(String savePath) async {
+    if (!mounted) return;
+    try {
+      final localFile = File(savePath);
+      if (await localFile.exists() && await localFile.length() > 0) {
+        final localController = VideoPlayerController.file(localFile);
+        
+        // Save state of current controller if initialized
+        Duration currentPosition = Duration.zero;
+        bool isPlayingBefore = false;
+        if (isReady) {
+          try {
+            currentPosition = _controller.value.position;
+            isPlayingBefore = _controller.value.isPlaying;
+            await _controller.pause();
+          } catch (e) {
+            debugPrint("获取旧播放器状态/暂停失败: $e");
+          }
+        }
+        
+        final oldController = _controller;
+        _controller = localController;
+        _isLocalPlayer = true;
+        
+        await _controller.initialize();
+        await _controller.seekTo(currentPosition);
+        _controller.setLooping(true);
+        if (isPlayingBefore || !isReady) {
+          _controller.play();
+        }
+        
+        if (mounted) {
+          setState(() {
+            isReady = true;
+          });
+        }
+        
+        // Dispose the old controller after widget tree updates
+        Future.delayed(const Duration(milliseconds: 100), () {
+          try {
+            oldController.dispose();
+          } catch (e) {
+            debugPrint("释放旧播放器失败: $e");
+          }
+        });
+        
+        debugPrint("已成功切换到本地播放器且位置同步完毕");
+      }
+    } catch (e) {
+      debugPrint("切换到本地播放器失败: $e");
     }
   }
 
@@ -131,10 +245,11 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
 
   @override
   void dispose() {
-    super.dispose();
+    _downloadCancelToken?.cancel("Widget disposed");
     _controller.dispose();
     _focus.removeListener(_onFocusChange);
     _focus.dispose();
+    super.dispose();
   }
 
   void fedback(str){
@@ -232,7 +347,7 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             borderRadius: const BorderRadius.all(Radius.circular(20)),
-            color: randomColor(),
+            color: Theme.of(context).scaffoldBackgroundColor,
           ),
           child: isReady
             ?AspectRatio(
@@ -245,7 +360,7 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
                 ImageWithFallback(
                   remoteURL: widget.articleFromStoryPage.picURL,
                   resourceId: CommonUtils.removeBaseUrl(widget.articleFromStoryPage.picURL),
-                  width: widget.articleFromStoryPage.width.toDouble(),
+                  width: MediaQuery.of(context).size.width - 40,
                   picWidth: widget.articleFromStoryPage.width.toDouble(),
                   picHeight: widget.articleFromStoryPage.height.toDouble(),
                   name: widget.articleFromStoryPage.articleName
@@ -275,16 +390,17 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: randomColor(),
+            color: Theme.of(context).scaffoldBackgroundColor,
           ),
           child: 
           ImageWithFallback(
             remoteURL: widget.articleFromStoryPage.picURL,
             resourceId: CommonUtils.removeBaseUrl(widget.articleFromStoryPage.picURL),
-            width: widget.articleFromStoryPage.width.toDouble(),
+            width: MediaQuery.of(context).size.width,
             picWidth: widget.articleFromStoryPage.width.toDouble(),
             picHeight: widget.articleFromStoryPage.height.toDouble(),
-            name: widget.articleFromStoryPage.articleName
+            name: widget.articleFromStoryPage.articleName,
+            fit: BoxFit.contain,
           )
         );
     } else {
@@ -294,23 +410,25 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
+            color: Theme.of(context).scaffoldBackgroundColor,
           ),
           child: Swiper(
             itemBuilder: (BuildContext context,int index){
             return
               Container(
-                width: MediaQuery.of(context).size.width / 2,
+                width: MediaQuery.of(context).size.width,
                 height: MediaQuery.of(context).size.height * height / width,
                 decoration: BoxDecoration(
-                  color: randomColor(),
+                  color: Theme.of(context).scaffoldBackgroundColor,
                 ),
                 child: ImageWithFallback(
                   remoteURL: imgs[index].key,
                   resourceId: CommonUtils.removeBaseUrl(imgs[index].key),
-                  width: widget.articleFromStoryPage.width.toDouble(),
-                  picWidth: widget.articleFromStoryPage.width.toDouble(),
-                  picHeight: widget.articleFromStoryPage.height.toDouble(),
-                  name: widget.articleFromStoryPage.articleName
+                  width: MediaQuery.of(context).size.width,
+                  picWidth: double.tryParse(imgs[index].width) ?? 0.0,
+                  picHeight: double.tryParse(imgs[index].height) ?? 0.0,
+                  name: widget.articleFromStoryPage.articleName,
+                  fit: BoxFit.contain,
                 )
               );
             },
@@ -367,7 +485,15 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
               color: Colors.blue,
               width: 40,
               height: 40,
-              child: i.whoseContent.avatar != '' ? ClipOval(child: Image.network(i.whoseContent.avatar)) : ClipOval(child: Image.asset("assets/wechat.png"))
+              child: i.whoseContent.avatar != '' 
+                  ? ClipOval(
+                      child: CachedNetworkImage(
+                        imageUrl: i.whoseContent.avatar,
+                        fit: BoxFit.cover,
+                        errorWidget: (context, url, error) => Image.asset("assets/wechat.png"),
+                      ),
+                    )
+                  : ClipOval(child: Image.asset("assets/wechat.png"))
             )
           ),
           Expanded(

@@ -38,6 +38,57 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
   double videoProgress = 0.0;
   double thumbProgress = 0.0;
 
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      final dynamic data = ModalRoute.of(context)?.settings.arguments;
+      if (data != null && data["initialVideo"] != null) {
+        final dynamic initVideo = data["initialVideo"];
+        XFile videoFile;
+        if (initVideo is XFile) {
+          videoFile = initVideo;
+        } else {
+          videoFile = XFile(initVideo.path);
+        }
+        
+        Future.microtask(() async {
+          try {
+            final controller = VideoPlayerController.file(File(videoFile.path));
+            await controller.initialize();
+            controller.setLooping(true);
+            controller.setVolume(1.0); 
+            controller.play();
+
+            final uint8list = await VideoThumbnail.thumbnailData(
+              video: videoFile.path,
+              imageFormat: ImageFormat.JPEG,
+              quality: 50, 
+            );
+
+            if (mounted) {
+              setState(() {
+                medias = [videoFile];
+                picData = uint8list;
+                _controller = controller;
+              });
+            }
+          } catch (e) {
+            debugPrint("Error initializing initial video: $e");
+          }
+        });
+      }
+      _initialized = true;
+    }
+  }
+
   @override
   void dispose() {
     _controller1.dispose();
@@ -297,7 +348,7 @@ class EditMovieState extends State<EditMovie> with AutomaticKeepAliveClientMixin
         actions:<Widget>[
           TextButton(
             onPressed: (medias.isEmpty || title == '' || content == '' || uploading ? null : () => _submit(uid, initUserData)),
-            child: Text('发布', style: TextStyle(color: (medias.isEmpty|| title == '' || content == '' ?Colors.grey: Colors.black))),
+            child: Text('发布', style: TextStyle(color: (medias.isEmpty || title == '' || content == '' || uploading ? Colors.grey : Colors.black))),
           )
         ]
       ),

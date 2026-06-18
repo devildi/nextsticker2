@@ -112,14 +112,42 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     public AMapLocationClient mLocationClient = null;
     public AMapLocationClientOption mLocationOption = null;
 
+    private boolean isValidLocation(double lat, double lon) {
+        return lat >= -90.0 && lat <= 90.0 && lon >= -180.0 && lon <= 180.0 && (lat != 0.0 || lon != 0.0);
+    }
+
+    private double getDistance(double lat1, double lon1, double lat2, double lon2) {
+        double R = 6371000; // Earth radius in meters
+        double dLat = Math.toRadians(lat2 - lat1);
+        double dLon = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                   Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) *
+                   Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+    }
+
     public AMapLocationListener mLocationListener = new AMapLocationListener() {
         @Override
         public void onLocationChanged(AMapLocation aMapLocation) {
             if (aMapLocation != null && aMapLocation.getErrorCode() == 0) {
                 Log.e("AmapErr","定位成功");
-                //LatLng latLng = new LatLng(aMapLocation.getLatitude(), aMapLocation.getLongitude());
-                depart = new LatLonPoint(aMapLocation.getLatitude(),aMapLocation.getLongitude());
-                aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(aMapLocation.getLatitude(), aMapLocation.getLongitude()),16,30,0)));
+                double newLat = aMapLocation.getLatitude();
+                double newLon = aMapLocation.getLongitude();
+                if (isValidLocation(newLat, newLon)) {
+                    android.content.SharedPreferences sharedPref = context1.getSharedPreferences("LocationCache", Context.MODE_PRIVATE);
+                    double cachedLat = Double.longBitsToDouble(sharedPref.getLong("cached_lat", Double.doubleToLongBits(0.0)));
+                    double cachedLon = Double.longBitsToDouble(sharedPref.getLong("cached_lon", Double.doubleToLongBits(0.0)));
+                    if (cachedLat == 0.0 || cachedLon == 0.0 || getDistance(cachedLat, cachedLon, newLat, newLon) > 500.0) {
+                        android.content.SharedPreferences.Editor editor = sharedPref.edit();
+                        editor.putLong("cached_lat", Double.doubleToRawLongBits(newLat));
+                        editor.putLong("cached_lon", Double.doubleToRawLongBits(newLon));
+                        editor.apply();
+                        Log.e("LocationCache", "Location cache updated: " + newLat + ", " + newLon);
+                    }
+                }
+                depart = new LatLonPoint(newLat, newLon);
+                aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(newLat, newLon),16,30,0)));
             } else {
                 String errText = "定位失败~~~~~~," + aMapLocation.getErrorCode()+ ": " + aMapLocation.getErrorInfo();
                 Log.e("AmapErr",errText);
@@ -145,7 +173,7 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
         ServiceSettings.updatePrivacyAgree(context,true);
         FlutterLoader loader = FlutterInjector.instance().flutterLoader();
         methodChannel = new MethodChannel(messenger, "gaode_native_channel");
-        methodChannel.setMethodCallHandler(this);
+        MethodChannelManager.register(methodChannel, this);
         context1 = context;
         activity1 = activity;
         authority();
@@ -155,9 +183,17 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
             mapView.onResume();
         }
         Log.e("map","地图初始化");
+        
+        android.content.SharedPreferences sharedPref = context.getSharedPreferences("LocationCache", Context.MODE_PRIVATE);
+        double cachedLat = Double.longBitsToDouble(sharedPref.getLong("cached_lat", Double.doubleToLongBits(0.0)));
+        double cachedLon = Double.longBitsToDouble(sharedPref.getLong("cached_lon", Double.doubleToLongBits(0.0)));
+        if (isValidLocation(cachedLat, cachedLon)) {
+            depart = new LatLonPoint(cachedLat, cachedLon);
+        }
+
         AMapOptions mapOptions = new AMapOptions();
         if(depart != null){
-            mapOptions.camera(new CameraPosition(new LatLng(depart.getLatitude(),depart.getLongitude()), 10f, 0, 0));
+            mapOptions.camera(new CameraPosition(new LatLng(depart.getLatitude(),depart.getLongitude()), 16f, 30, 0));
             mapView = new MapView(context, mapOptions);
         } else {
             mapView = new MapView(context);
@@ -274,34 +310,53 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
         try{
             JSONArray jsonArray = new JSONArray(jsonData);
             for (int i=0; i < jsonArray.length(); i++)    {
-                JSONObject jsonObject = jsonArray.getJSONObject(i);
-                String nameOfScence = jsonObject.getString("nameOfScence");
-                double latitude = jsonObject.getDouble("latitude");
-                double longitude = jsonObject.getDouble("longitude");
-                int category = jsonObject.getInt("category");
-                boolean done = jsonObject.getBoolean("done");
+                try {
+                    JSONObject jsonObject = jsonArray.getJSONObject(i);
+                    String nameOfScence = jsonObject.optString("nameOfScence", "");
+                    int category = jsonObject.optInt("category", 0);
+                    boolean done = jsonObject.optBoolean("done", false);
 
-                LatLng latLng = new LatLng(latitude,longitude);
-                MarkerOptions markerOptions = new MarkerOptions();
-                if(category == 0){
-                    if(!done){
-                        markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.location));
-                    } else {
-                        markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.amap_through));
+                    String latStr = jsonObject.optString("latitude", "");
+                    String lonStr = jsonObject.optString("longitude", "");
+                    double latitude = 0.0;
+                    double longitude = 0.0;
+                    boolean hasCoords = false;
+
+                    if (!latStr.isEmpty() && !lonStr.isEmpty()) {
+                        try {
+                            latitude = Double.parseDouble(latStr);
+                            longitude = Double.parseDouble(lonStr);
+                            hasCoords = (latitude != 0.0 || longitude != 0.0);
+                        } catch (NumberFormatException e) {
+                            hasCoords = false;
+                        }
                     }
-                } else if(category == 1){
-                    markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.hotel));
-                } else if(category == 2){
-                    markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.food));
+
+                    LatLng latLng = new LatLng(latitude, longitude);
+                    MarkerOptions markerOptions = new MarkerOptions();
+                    if(category == 0){
+                        if(!done){
+                            markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.location));
+                        } else {
+                            markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.amap_through));
+                        }
+                    } else if(category == 1){
+                        markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.hotel));
+                    } else if(category == 2){
+                        markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.food));
+                    }
+                    markerOptions.position(latLng);
+                    markerOptions.title(nameOfScence);
+                    markerOptions.snippet(Integer.toString(category) + "#" + Boolean.toString(done));
+                    markerOptions.visible(hasCoords);
+                    Marker marker = aMap.addMarker(markerOptions);
+                    pointsArray.add(marker);
+                } catch(Exception e) {
+                    Log.e("amap", "渲染单个点坐标异常: " + e.getMessage());
                 }
-                markerOptions.position(latLng);
-                markerOptions.title(nameOfScence);
-                markerOptions.snippet(Integer.toString(category) + "#" + Boolean.toString(done));
-                Marker marker = aMap.addMarker(markerOptions);
-                pointsArray.add(marker);
             }
         } catch(Exception e){
-
+            Log.e("amap", "渲染点坐标异常: " + e.getMessage());
         }
     }
 
@@ -321,8 +376,12 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     }
 
     private void setCenter(Marker marker){
-        //Log.e("amap","居中");
-        aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(marker.getPosition(),16,30,0)));
+        if (marker != null && marker.getPosition() != null) {
+            LatLng pos = marker.getPosition();
+            if (pos.latitude != 0.0 || pos.longitude != 0.0) {
+                aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(pos, 16, 30, 0)));
+            }
+        }
     }
 
     @NonNull
@@ -354,6 +413,7 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
             mapView.onDestroy();  // 正确释放地图资源
             container.removeAllViews();  // 清理视图层次
         }
+        MethodChannelManager.unregister(this);
     }
 
     @Override
@@ -377,7 +437,12 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                 Log.e("amap",(String)(marker.getTitle()));
                 setCenter(marker);
                 destination = marker;
-                methodChannel.invokeMethod("openBottomSheet", marker.getTitle());
+                int index = pointsArray.indexOf(marker);
+                if (index != -1) {
+                    methodChannel.invokeMethod("openBottomSheet", index);
+                } else {
+                    methodChannel.invokeMethod("openBottomSheet", marker.getTitle());
+                }
             } else {
                 if(marker.isInfoWindowShown()){
                     marker.hideInfoWindow();
@@ -690,13 +755,22 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
             };
             initData(text);
         }else if ("setDestination".equals(call.method)) {
-            String text = (String) call.arguments;
-            Log.e("setDestination", text);
-            for(int i =0 ; i < pointsArray.size(); i++ ){
-                if(text.equals(pointsArray.get(i).getTitle())){
-                    destination = pointsArray.get(i);
+            if (call.arguments instanceof Integer) {
+                int index = (Integer) call.arguments;
+                Log.e("setDestination", "index: " + index);
+                if (index >= 0 && index < pointsArray.size()) {
+                    destination = pointsArray.get(index);
                     setCenter(destination);
-                    break;
+                }
+            } else if (call.arguments instanceof String) {
+                String text = (String) call.arguments;
+                Log.e("setDestination", "text: " + text);
+                for(int i =0 ; i < pointsArray.size(); i++ ){
+                    if(text.equals(pointsArray.get(i).getTitle())){
+                        destination = pointsArray.get(i);
+                        setCenter(destination);
+                        break;
+                    }
                 }
             }
         }else if("changeCenter".equals(call.method)){
@@ -721,8 +795,29 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
             }catch(Exception e){
 
             }
-        }else if ("naviget".equals(call.method)) {
-            navigetInGaodeApp();
+        }else if ("naviget".equals(call.method) || "navigetGaode".equals(call.method)) {
+            Log.e("amap", "naviget/navigetGaode called on NativeView");
+            String mode = "";
+            if (call.arguments instanceof String) {
+                mode = (String) call.arguments;
+            }
+            int t = 0;
+            if ("bus".equals(mode)) {
+                t = 1;
+            }
+            Log.e("amap", "mode: " + mode + ", t: " + t + ", destination: " + (destination != null ? destination.getTitle() : "null"));
+            navigetInGaodeApp(t);
+        }else if ("navigetGoogle".equals(call.method)) {
+            Log.e("amap", "navigetGoogle called on NativeView");
+            String mode = "";
+            if (call.arguments instanceof String) {
+                mode = (String) call.arguments;
+            }
+            String googleMode = "driving";
+            if ("bus".equals(mode)) {
+                googleMode = "transit";
+            }
+            launchGoogleMapApp(googleMode);
         }else if ("callTexi".equals(call.method)) {
             callTexi();
         }else if ("openSysLocationPage".equals(call.method)) {
@@ -759,8 +854,12 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                     markerOptions.title(text);
                     markerOptions.snippet(newSnippet);
                     Marker newMarker = aMap.addMarker(markerOptions);
-                    pointsArray.remove(marker);
-                    pointsArray.add(newMarker);
+                    int index = pointsArray.indexOf(marker);
+                    if (index != -1) {
+                        pointsArray.set(index, newMarker);
+                    } else {
+                        pointsArray.add(newMarker);
+                    }
                     marker.destroy();
                     break;
                 }
@@ -769,33 +868,123 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     }
 
     private void callTexi() {
+        Context launchContext = activity1 != null ? activity1 : context1;
         try{
             Intent intent = new Intent("android.intent.action.VIEW", android.net.Uri.parse("amapuri://route/plan/?dlat="+ destination.getPosition().latitude + "&dlon=" + destination.getPosition().longitude + "&dev=0&t=" + 6));
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context1.startActivity(intent);
+            if (!(launchContext instanceof Activity)) {
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            launchContext.startActivity(intent);
         } catch (Exception e){
-            Toast.makeText(context1, "您尚未安装高德地图", Toast.LENGTH_SHORT).show();
+            Toast.makeText(launchContext, "您尚未安装高德地图", Toast.LENGTH_SHORT).show();
             Uri uri = Uri.parse("market://details?id=com.autonavi.minimap");
             Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context1.startActivity(intent);
+            if (!(launchContext instanceof Activity)) {
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            launchContext.startActivity(intent);
         }
         //goGaodeMap(context1, destination.getPosition().latitude, destination.getPosition().longitude, 6);
     }
 
-    private void navigetInGaodeApp() {
-        try{
-            Intent intent = new Intent("android.intent.action.VIEW", android.net.Uri.parse("amapuri://route/plan/?dlat="+ destination.getPosition().latitude + "&dlon=" + destination.getPosition().longitude + "&dev=0&t=" + 0));
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context1.startActivity(intent);
-        } catch (Exception e){
-            Toast.makeText(context1, "您尚未安装高德地图", Toast.LENGTH_SHORT).show();
-            Uri uri = Uri.parse("market://details?id=com.autonavi.minimap");
-            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
-            intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            context1.startActivity(intent);
+    private void navigetInGaodeApp(int t) {
+        if (destination == null) {
+            Log.e("amap", "destination is null in navigetInGaodeApp!");
+            Toast.makeText(context1, "未选中目的地", Toast.LENGTH_SHORT).show();
+            return;
         }
-        //goGaodeMap(context1, destination.getPosition().latitude, destination.getPosition().longitude, 0);
+        double latitude = 0.0;
+        double longitude = 0.0;
+        try {
+            latitude = destination.getPosition().latitude;
+            longitude = destination.getPosition().longitude;
+        } catch (Exception e) {
+            Log.e("amap", "Failed to get position from destination marker", e);
+        }
+        Context launchContext = activity1 != null ? activity1 : context1;
+        try{
+            Log.e("amap", "navigetInGaodeApp context is: " + launchContext + ", lat: " + latitude + ", lon: " + longitude + ", mode: " + t);
+            Intent intent = new Intent("android.intent.action.VIEW", android.net.Uri.parse("amapuri://route/plan/?dlat="+ latitude + "&dlon=" + longitude + "&dev=0&t=" + t));
+            if (!(launchContext instanceof Activity)) {
+                intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            }
+            launchContext.startActivity(intent);
+        } catch (Exception e){
+            Log.e("amap", "Failed to launch Gaode Map app", e);
+            Toast.makeText(launchContext, "您尚未安装高德地图", Toast.LENGTH_SHORT).show();
+            try {
+                Uri uri = Uri.parse("market://details?id=com.autonavi.minimap");
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                if (!(launchContext instanceof Activity)) {
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                }
+                launchContext.startActivity(intent);
+            } catch (Exception storeException) {
+                Log.e("amap", "Failed to launch Play Store link, falling back to Web browser", storeException);
+                try {
+                    Uri webUri = Uri.parse("https://uri.amap.com/marker?position=" + longitude + "," + latitude + "&name=" + Uri.encode(destination.getTitle()));
+                    Intent webIntent = new Intent(Intent.ACTION_VIEW, webUri);
+                    if (!(launchContext instanceof Activity)) {
+                        webIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    }
+                    launchContext.startActivity(webIntent);
+                } catch (Exception webException) {
+                    Log.e("amap", "Failed to launch Web browser fallback", webException);
+                }
+            }
+        }
+        //goGaodeMap(context1, destination.getPosition().latitude, destination.getPosition().longitude, t);
+    }
+
+    private void launchGoogleMapApp(String d) {
+        if (destination == null) {
+            Log.e("amap", "destination is null in launchGoogleMapApp!");
+            Toast.makeText(context1, "未选中目的地", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        double lat = destination.getPosition().latitude;
+        double lon = destination.getPosition().longitude;
+        double startLat = 0.0;
+        double startLon = 0.0;
+        if (depart != null) {
+            startLat = depart.getLatitude();
+            startLon = depart.getLongitude();
+        }
+        
+        Context launchContext = activity1 != null ? activity1 : context1;
+        String url1 = "https://www.google.com/maps/dir/?api=1&origin=" + startLat + "%2C" + startLon + "&destination=" + lat + "%2C" + lon + "&travelmode=" + d;
+        if (isInstallApk(launchContext, "com.google.android.apps.maps")) {
+            try {
+                Intent intent = new Intent("android.intent.action.VIEW", Uri.parse(url1));
+                if (!(launchContext instanceof Activity)) {
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                }
+                intent.setPackage("com.google.android.apps.maps");
+                launchContext.startActivity(intent);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        } else {
+            Toast.makeText(launchContext, "您尚未安装谷歌地图！", Toast.LENGTH_SHORT).show();
+            try {
+                Uri uri = Uri.parse("market://details?id=com.google.android.apps.maps");
+                Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+                if (!(launchContext instanceof Activity)) {
+                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                }
+                launchContext.startActivity(intent);
+            } catch (Exception e) {
+                try {
+                    Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url1));
+                    if (!(launchContext instanceof Activity)) {
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    }
+                    launchContext.startActivity(intent);
+                } catch (Exception webEx) {
+                    webEx.printStackTrace();
+                }
+            }
+        }
     }
 
     private void add(List<Polyline> Polylines1, List<Polyline> Polylines2){

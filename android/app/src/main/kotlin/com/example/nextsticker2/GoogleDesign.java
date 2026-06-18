@@ -91,7 +91,7 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
 
     GoogleDesign( Context context, BinaryMessenger messenger, int id, Map<String, Object> creationParams, Activity activity) {
         methodChannel = new MethodChannel(messenger, "gaode_native_channel");
-        methodChannel.setMethodCallHandler(this);
+        MethodChannelManager.register(methodChannel, this);
         //nativeView = LayoutInflater.from(context).inflate(R.layout.infowindow, null);
         context1 = context;
         activity1 = activity;
@@ -116,14 +116,16 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
         mapView.getMapAsync(this);
         requestQueue = Volley.newRequestQueue(context1);
         imageLoader = new ImageLoader(requestQueue, new ImageLoader.ImageCache() {
+            private final java.util.Map<String, Bitmap> cache = new java.util.HashMap<>();
+
             @Override
             public Bitmap getBitmap(String url) {
-                return null;
+                return cache.get(url);
             }
 
             @Override
             public void putBitmap(String url, Bitmap bitmap) {
-                // 可以实现自定义的图片缓存逻辑
+                cache.put(url, bitmap);
             }
         });
 
@@ -169,6 +171,7 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
     @Override
     public void dispose() {
         mapView.onPause();
+        MethodChannelManager.unregister(this);
     }
 
     @SuppressLint("MissingPermission")
@@ -413,7 +416,7 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
         contentTextView.setText(marker.getSnippet());
         imageView = nativeView.findViewById(R.id.myImageView);
         String url = (String)marker.getTag();
-        if (imageUrl == null || imageUrl.isEmpty()) {
+        if (url == null || url.isEmpty()) {
             Log.e("map", "清除图片缓存");
             imageView.setImageBitmap(null); // 清除图片
             imageView.setVisibility(View.GONE); // 隐藏 ImageView
@@ -423,12 +426,24 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
             }
             // 正常加载图片
             Log.e("map", "加载图片");
-            ImageLoader.ImageListener imageListener = ImageLoader.getImageListener(
-                    imageView,
-                    0, // 默认图片
-                    0  // 失败图片
-            );
-            imageLoader.get(imageUrl, imageListener);
+            imageLoader.get(url, new ImageLoader.ImageListener() {
+                @Override
+                public void onResponse(ImageLoader.ImageContainer response, boolean isImmediate) {
+                    Bitmap bitmap = response.getBitmap();
+                    if (bitmap != null) {
+                        imageView.setImageBitmap(bitmap);
+                        // If the load was asynchronous (not immediate), refresh the info window
+                        if (!isImmediate && marker.isInfoWindowShown()) {
+                            marker.showInfoWindow();
+                        }
+                    }
+                }
+
+                @Override
+                public void onErrorResponse(com.android.volley.VolleyError error) {
+                    Log.e("map", "加载图片错误: " + error.getMessage());
+                }
+            });
         }
         return nativeView;
     }

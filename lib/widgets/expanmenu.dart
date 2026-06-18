@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:nextsticker2/model/travel_model.dart';
 
 class ExpansionTileSample extends StatefulWidget {
   final List destinations;
@@ -31,7 +32,7 @@ class ExpansionTileSampleContentState extends State<ExpansionTileSample> {
       dis1.asMap().forEach((index1, i){
         if(i.category == 0){
           dayData.add(_sonItem(
-            '${i.nameOfScence}', 
+            i, 
             context, 
             widget.openBottomSheet, 
             i.done,
@@ -73,19 +74,19 @@ class ExpansionTileSampleContentState extends State<ExpansionTileSample> {
   }
 }
 
-Widget _sonItem(string, context, fn, done, check){
+Widget _sonItem(DetailModel item, context, fn, done, check){
   return
     InkWell(
       onTap: (){
         Navigator.pop(context);
-        fn(context, string);
+        fn(context, item);
       }, 
       onLongPress: (){
         Navigator.pop(context);
-        debugPrint(string);
+        debugPrint(item.nameOfScence);
       },
       child: ListTile(
-          title: Text(string,style: done 
+          title: Text(item.nameOfScence, style: done 
             ? const TextStyle(
                 decoration: TextDecoration.lineThrough
               )
@@ -94,7 +95,7 @@ Widget _sonItem(string, context, fn, done, check){
           trailing: Checkbox(
             value: done,
             onChanged: (flag){
-              check(string);
+              check(item.nameOfScence);
             },
           ),
         )

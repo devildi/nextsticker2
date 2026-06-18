@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:nextsticker2/store/store.dart';
 import 'package:nextsticker2/pages/map_design.dart';
 import 'package:image_picker/image_picker.dart';
-import "package:images_picker/images_picker.dart";
 import 'package:flutter/foundation.dart';
 import 'package:qiniu_flutter_sdk/qiniu_flutter_sdk.dart';
 import 'dart:io';
@@ -167,22 +166,17 @@ class InitTripState2 extends State<InitTrip2> {
   }
 
   Future _add() async {
-    List res;
-    if(defaultTargetPlatform == TargetPlatform.iOS){
-      res = await (ImagesPicker.pick(
-        count: 1,
-        pickType: PickType.image
-      )) as List<dynamic>;
-    } else {
+    try {
       final ImagePicker picker = ImagePicker();
-      res = await picker.pickMultiImage();
+      final XFile? image = await picker.pickImage(source: ImageSource.gallery);
+      if (image != null) {
+        setState(() {
+          medias = [image];
+        });
+      }
+    } catch (e) {
+      debugPrint("InitTrip2 pickImage error: $e");
     }
-    if(res.isNotEmpty){
-      setState(() {
-        medias = res;
-      });
-    }
-   
   }
 
   void upload() async{

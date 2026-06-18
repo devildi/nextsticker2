@@ -19,12 +19,13 @@ class UserData with ChangeNotifier {
     required this.cloneData,
     required this.index,
     required this.picsFromAlbum,
+    Set<String>? processingNames,
     this.picBing = '',
     this.des = '',
     this.category = 0,
     this.fetchImgStatus = '正在完善信息中，请耐心等待...',
     this.swiperIndex = 0,
-  });
+  }) : _processingNames = processingNames ?? {};
   
   int category;
   int swiperIndex;
@@ -47,6 +48,19 @@ class UserData with ChangeNotifier {
   TravelModel cloneData;
   List index;
   List picsFromAlbum;
+  final Set<String> _processingNames;
+
+  Set<String> get processingNames => _processingNames;
+
+  void addProcessingName(String name) {
+    _processingNames.add(name);
+    notifyListeners();
+  }
+
+  void removeProcessingName(String name) {
+    _processingNames.remove(name);
+    notifyListeners();
+  }
 
   void setCategory(int a){
     category = a;
