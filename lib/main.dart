@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -35,7 +37,18 @@ import 'package:nextsticker2/tools/tools.dart';
 //const wsURL = 'ws://10.214.72.50:4000';
 //const wsURL = 'wss://nextsticker.cn';
 
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    final client = super.createHttpClient(context);
+    client.badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+    client.userAgent = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+    return client;
+  }
+}
+
 void main() async{
+  HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   Provider.debugCheckInvalidValueType = null;
   SharedPreferences prefs = await SharedPreferences.getInstance();
@@ -101,6 +114,16 @@ class MyApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'),
+        Locale('en', 'US'),
+      ],
+      locale: const Locale('zh', 'CN'),
       initialRoute:"/",
       routes:{
         "detail": (context) => const Detail(),
@@ -268,6 +291,7 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
     socket = io.io(CommonUtils.developmentMode ? CommonUtils.wsLan : 'wss://nextsticker.cn', <String, dynamic>{
         'transports': ['websocket'],
+        'forceNew': true,
     }); 
     socket.on('connect', (_) {
       debugPrint('websocket connected..');
@@ -340,7 +364,11 @@ class _MyHomePageState extends State<MyHomePage> {
           Provider.of<UserData>(context, listen: false).setDomestic(content);
           break;
         case 'alert':
+          if (!context.mounted) return;
           _openAlert(context);
+          break;
+        case 'permissionGranted':
+          platform.invokeMethod('startLoaction');
           break;
         case 'clearInfor':
           Provider.of<UserData>(context, listen: false).setTrafficInfo([]);
@@ -612,7 +640,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return true;
   }
 
-  void _openAlert(context){
+  void _openAlert(BuildContext context){
     showDialog(
       context: context,
       builder: (context) {
@@ -628,6 +656,8 @@ class _MyHomePageState extends State<MyHomePage> {
         );
       });
   }
+
+
 
   List flatData(array){
     List newArray = [];
@@ -1451,6 +1481,9 @@ class _SafeNetworkImageState extends State<SafeNetworkImage> {
     }
     return CachedNetworkImage(
       imageUrl: widget.imageUrl,
+      httpHeaders: const {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+      },
       width: widget.width,
       height: widget.height,
       fit: widget.fit,

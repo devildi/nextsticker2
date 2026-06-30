@@ -287,14 +287,9 @@ class SyncHelper {
         final serverStories = await StoryDao.fetchFromServer(9999);
         for (var story in serverStories.storyList) {
           // Only delete user-owned server stories if auth.name is not empty
+          // 覆盖时只删 MongoDB 记录，不删七牛云资源（传空数组跳过七牛删除）
           if (auth.name.isNotEmpty && (story.author.name == auth.name || story.author.uid == auth.uid)) {
-            List<String> keys = [];
-            if (story.picURL.isNotEmpty) keys.add(story.picURL);
-            if (story.videoURL.isNotEmpty) keys.add(story.videoURL);
-            if (story.album.isNotEmpty) {
-              keys.addAll(story.album.map((e) => e.key).toList());
-            }
-            await StoryDao.deleteStoryOnServer(story.articleId, keys);
+            await StoryDao.deleteStoryOnServer(story.articleId, []);
           }
         }
       } catch (e) {

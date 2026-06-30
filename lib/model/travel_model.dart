@@ -35,7 +35,13 @@ class Comment {
     //this.whichArticle
   });
 
-  factory Comment.fromJson(Map<String, dynamic> json) {
+  factory Comment.fromJson(dynamic json) {
+    if (json is! Map) {
+      return Comment(
+        content: '',
+        whoseContent: AuthModel(uid: json?.toString() ?? '', like: [], comment: [], collect: [], follow: [], followed: []),
+      );
+    }
     return Comment(
       content: json["content"] ?? '',
       whoseContent: json["whoseContent"] is Map<String, dynamic> 
@@ -47,8 +53,7 @@ class Comment {
   Map<String, dynamic> toJson() {
     return {
       "content": content,
-      "whoseContent": whoseContent,
-      //"whichArticle": this.whichArticle,
+      "whoseContent": whoseContent.toJson(),
     };
   }
 }

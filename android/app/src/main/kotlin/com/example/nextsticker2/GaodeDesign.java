@@ -248,6 +248,15 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
         TextView contentTextView = nativeView.findViewById(R.id.contentTextView);
         titleTextView.setText(marker.getTitle());
         contentTextView.setText(marker.getSnippet());
+        
+        ImageView addIcon = nativeView.findViewById(R.id.addIcon);
+        String snippet = marker.getSnippet();
+        if (snippet == null || snippet.trim().isEmpty()) {
+            addIcon.setVisibility(View.VISIBLE);
+        } else {
+            addIcon.setVisibility(View.GONE);
+        }
+
         imageView = nativeView.findViewById(R.id.myImageView);
         if (imageUrl == null || imageUrl.isEmpty()) {
             Log.e("map", "清除图片缓存");

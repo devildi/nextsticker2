@@ -46,6 +46,10 @@ class TravelDao{
 
   // --- Local CRUD Methods ---
 
+  static Future<List<TravelModel>> getAllLocalTrips() async {
+    return await _loadLocalTrips();
+  }
+
   static Future<TravelModel> fetch(uid) async{
     final trips = await _loadLocalTrips();
     return trips.firstWhere(

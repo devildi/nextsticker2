@@ -10,6 +10,7 @@ import 'package:nextsticker2/dao/travel_dao.dart';
 import 'package:flutter/foundation.dart';
 import 'package:nextsticker2/pages/arrange.dart';
 import 'package:nextsticker2/pages/laststep.dart';
+import 'package:nextsticker2/pages/multi_select_web_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MapDesign extends StatefulWidget {
@@ -45,6 +46,14 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
   Timer? _expandTimer;
   bool _isDragging = false;
 
+  // Search queue variables
+  UserData? _userData;
+  int _lastTotalPointsCount = 0;
+  List<String> _searchQueue = [];
+  int _totalQueueLength = 0;
+  int _currentQueueIndex = 0;
+  String? _currentSearchingSpot;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +61,13 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
     _isGaodeMap = widget.tripData.domestic == 1;
     _checkDraft();
     _readClipboardToSearchBox();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _userData = Provider.of<UserData>(context, listen: false);
+        _userData?.addListener(_onUserDataChanged);
+        _lastTotalPointsCount = _countTotalPoints(_userData?.cloneData);
+      }
+    });
   }
 
   Future<void> _readClipboardToSearchBox() async {
@@ -154,114 +170,7 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
     }
   }
 
-  void _showPasteLinkDialog() async {
-    final TextEditingController linkController = TextEditingController();
-    
-    // Automatically read clipboard content if available
-    try {
-      ClipboardData? clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
-      if (clipboardData != null && clipboardData.text != null && clipboardData.text!.isNotEmpty) {
-        linkController.text = clipboardData.text!;
-      }
-    } catch (e) {
-      debugPrint('获取剪切板数据失败: $e');
-    }
 
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('粘贴文本或链接'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: linkController,
-              autofocus: true,
-              maxLines: 6,
-              minLines: 6,
-              decoration: const InputDecoration(
-                contentPadding: EdgeInsets.all(12),
-                border: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.blue, width: 1.5),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: Colors.grey),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () {
-                    linkController.clear();
-                  },
-                  child: const Text('清空', style: TextStyle(color: Colors.red, fontSize: 16)),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: () async {
-                    final String url = linkController.text.trim();
-                    if (url.isEmpty) return;
-                    Navigator.of(context).pop(); // Close input dialog
-                    
-                    // Show loading indicator
-                    showDialog(
-                      context: context,
-                      barrierDismissible: false,
-                      builder: (context) => const Center(
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                    
-                    try {
-                      debugPrint('正在通过链接解析行程: $url');
-                      final TravelModel parsedTrip = await TravelDao.fromLLM(url);
-                      if (!mounted) return;
-                      Navigator.of(context).pop(); // Close loading indicator
-                      
-                      if (parsedTrip.detail.isNotEmpty && parsedTrip.detail[0].dayList.isNotEmpty) {
-                        Provider.of<UserData>(context, listen: false).setCloneData(parsedTrip);
-                        setState(() {
-                          cloneData = parsedTrip;
-                        });
-                        // Inject the first point to map
-                        widget.platform.invokeMethod('InjectOnePoint', parsedTrip.detail[0].dayList[0].toJson().toString());
-                        fedback('链接行程导入成功！');
-                      } else {
-                        fedback('解析失败，导入数据为空！');
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        Navigator.of(context).pop(); // Close loading indicator
-                      }
-                      debugPrint('解析链接失败: $e');
-                      fedback('导入失败，请检查链接或稍后再试！');
-                    }
-                  },
-                  child: const Text('解析', style: TextStyle(color: Colors.blue, fontSize: 16)),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
   Widget platformView() {
     final firstPoint = (cloneData.detail.isNotEmpty && cloneData.detail[0].dayList.isNotEmpty)
@@ -311,6 +220,7 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _userData?.removeListener(_onUserDataChanged);
     WidgetsBinding.instance.removeObserver(this);
     _searchFocusNode.dispose();
     _expandTimer?.cancel();
@@ -331,6 +241,84 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
     });
   }
 
+  int _countTotalPoints(TravelModel? travelModel) {
+    if (travelModel == null) return 0;
+    int count = 0;
+    for (var day in travelModel.detail) {
+      count += day.dayList.length;
+    }
+    return count;
+  }
+
+  void _onUserDataChanged() {
+    if (!mounted) return;
+    final currentCount = _countTotalPoints(_userData?.cloneData);
+    if (currentCount > _lastTotalPointsCount) {
+      _lastTotalPointsCount = currentCount;
+      if (_searchQueue.isNotEmpty || _currentSearchingSpot != null) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            _triggerNextSearch();
+          }
+        });
+      }
+    } else {
+      _lastTotalPointsCount = currentCount;
+    }
+  }
+
+  void _startSearchQueue(List<String> spots) {
+    setState(() {
+      _searchQueue = List.from(spots);
+      _totalQueueLength = spots.length;
+      _currentQueueIndex = 0;
+      _currentSearchingSpot = null;
+    });
+    if (_userData != null) {
+      _lastTotalPointsCount = _countTotalPoints(_userData!.cloneData);
+    }
+    _triggerNextSearch();
+  }
+
+  void _triggerNextSearch() {
+    if (_searchQueue.isEmpty) {
+      setState(() {
+        _currentSearchingSpot = null;
+        _totalQueueLength = 0;
+        _currentQueueIndex = 0;
+      });
+      fedback('所有景点搜索完成！');
+      return;
+    }
+    
+    final nextSpot = _searchQueue.removeAt(0);
+    setState(() {
+      _currentSearchingSpot = nextSpot;
+      _currentQueueIndex = _totalQueueLength - _searchQueue.length;
+      _controller.text = nextSpot;
+      input = nextSpot;
+    });
+    
+    _onSubmit(nextSpot);
+  }
+
+  void _skipCurrentSpot() {
+    if (_currentSearchingSpot != null) {
+      fedback('已跳过景点: $_currentSearchingSpot');
+    }
+    _triggerNextSearch();
+  }
+
+  void _cancelSearchQueue() {
+    setState(() {
+      _searchQueue.clear();
+      _currentSearchingSpot = null;
+      _totalQueueLength = 0;
+      _currentQueueIndex = 0;
+    });
+    fedback('已取消景点搜索队列');
+  }
+
   void _delete(point){
     TravelModel clone = Provider.of<UserData>(context, listen: false).cloneData;
     for(int i =0; i < clone.detail.length; i++){
@@ -345,10 +333,33 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
   }
 
   void _onSubmit(str)async {
-    await widget.platform.invokeMethod('findPOI', str);
-    _controller.text = '';
-    if (!context.mounted) return;
-    Provider.of<UserData>(context, listen: false).setLoading(true);
+    final String text = (str as String).trim();
+    if (text.isEmpty) return;
+
+    // Detect if there is a URL inside the text using regex
+    final RegExp urlRegExp = RegExp(r'(https?://[^\s]+)');
+    final Match? match = urlRegExp.firstMatch(text);
+
+    if (match != null) {
+      final String extractedUrl = match.group(0)!;
+      _controller.text = '';
+      setState(() {
+        input = '';
+      });
+      // Navigate directly to MultiSelectWebPage with the extracted URL
+      Navigator.push<List<String>>(context, MaterialPageRoute(
+        builder: (context) => MultiSelectWebPage(initialUrl: extractedUrl),
+      )).then((spots) {
+        if (spots != null && spots.isNotEmpty) {
+          _startSearchQueue(spots);
+        }
+      });
+    } else {
+      await widget.platform.invokeMethod('findPOI', text);
+      _controller.text = '';
+      if (!context.mounted) return;
+      Provider.of<UserData>(context, listen: false).setLoading(true);
+    }
   }
 
   void _reset(){
@@ -737,31 +748,9 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
             ),
           ),
           centerTitle: true,
-          leadingWidth: 120,
-          leading: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(width: 8),
-              IconButton(
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.dehaze, color: Colors.black),
-                onPressed: () => _scaffoldKey2.currentState?.openDrawer(),
-              ),
-              const SizedBox(width: 12),
-              TextButton(
-                onPressed: _showPasteLinkDialog,
-                style: TextButton.styleFrom(
-                  padding: EdgeInsets.zero,
-                  minimumSize: Size.zero,
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                child: const Text(
-                  '粘贴',
-                  style: TextStyle(color: Colors.blue, fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
+          leading: IconButton(
+            icon: const Icon(Icons.dehaze, color: Colors.black),
+            onPressed: () => _scaffoldKey2.currentState?.openDrawer(),
           ),
           actions: [
             TextButton(
@@ -878,7 +867,81 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
             ?const Center(
               child: CircularProgressIndicator(),
             )
-            :Container()
+            :Container(),
+            if (_searchQueue.isNotEmpty || _currentSearchingSpot != null)
+              Positioned(
+                left: 84,
+                right: 16,
+                bottom: 16,
+                child: SizedBox(
+                  height: 56,
+                  child: Card(
+                    margin: EdgeInsets.zero,
+                    elevation: 6,
+                    shadowColor: Colors.black26,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    color: Colors.white,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.queue_play_next, color: Colors.blue.shade700, size: 18),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '顺序搜索 ($_currentQueueIndex/$_totalQueueLength)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 10,
+                                    color: Colors.grey.shade500,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  _currentSearchingSpot ?? '',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          TextButton(
+                            onPressed: _skipCurrentSpot,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.blue.shade700,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('跳过', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                          const SizedBox(width: 4),
+                          TextButton(
+                            onPressed: _cancelSearchQueue,
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red.shade700,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text('取消', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
         floatingActionButton: _hasDraft

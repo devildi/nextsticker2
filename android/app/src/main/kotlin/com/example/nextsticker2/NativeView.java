@@ -151,7 +151,6 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
             } else {
                 String errText = "定位失败~~~~~~," + aMapLocation.getErrorCode()+ ": " + aMapLocation.getErrorInfo();
                 Log.e("AmapErr",errText);
-                methodChannel.invokeMethod("alert", true);
             }
         }
     };
@@ -241,7 +240,14 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
             mLocationOption.setLocationMode(AMapLocationClientOption.AMapLocationMode.Hight_Accuracy);
             //设置单词或连续定位
             mLocationOption.setOnceLocation(true);
-            locationOnce();
+
+            boolean hasPermission = true;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                hasPermission = (context1.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED);
+            }
+            if (hasPermission) {
+                locationOnce();
+            }
         }catch (Exception e){
             e.printStackTrace();
         }
@@ -363,14 +369,10 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     private void authority() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (context1.checkSelfPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                //如果应用之前请求过此权限但用户拒绝了请求，此方法将返回 true。
-                Log.e("quanxian","权限");
-                if (ActivityCompat.shouldShowRequestPermissionRationale(activity1, android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                    //这里可以写个对话框之类的项向用户解释为什么要申请权限，并在对话框的确认键后续再次申请权限.它在用户选择"不再询问"的情况下返回false
-                } else {
-                    //申请权限，字符串数组内是一个或多个要申请的权限，1是申请权限结果的返回参数，在onRequestPermissionsResult可以得知申请结果
-                    ActivityCompat.requestPermissions(activity1, new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-                }
+                Log.e("quanxian","请求定位权限");
+                android.content.SharedPreferences sharedPref = context1.getSharedPreferences("LocationCache", Context.MODE_PRIVATE);
+                sharedPref.edit().putBoolean("permission_requested", true).apply();
+                ActivityCompat.requestPermissions(activity1, new String[]{android.Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 1);
             }
         }
     }
@@ -719,6 +721,19 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
         if ("startLoaction".equals(call.method)) {
             String text = (String) call.arguments;
             Log.e("amap", "startLoaction");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (context1.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    android.content.SharedPreferences sharedPref = context1.getSharedPreferences("LocationCache", Context.MODE_PRIVATE);
+                    boolean requestedBefore = sharedPref.getBoolean("permission_requested", false);
+                    if (requestedBefore && !ActivityCompat.shouldShowRequestPermissionRationale(activity1, Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                        methodChannel.invokeMethod("alert", true);
+                    } else {
+                        sharedPref.edit().putBoolean("permission_requested", true).apply();
+                        ActivityCompat.requestPermissions(activity1, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                    }
+                    return;
+                }
+            }
             locationOnce();
         } else if ("genRoute".equals(call.method)) {
             if(null != depart){

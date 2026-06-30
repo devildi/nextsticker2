@@ -8,6 +8,10 @@ import 'package:nextsticker2/store/store.dart';
 import 'package:nextsticker2/pages/map_design.dart';
 import 'package:uuid/uuid.dart';
 import 'package:nextsticker2/tools/sync_helper.dart';
+import 'package:nextsticker2/pages/train_ticket.dart';
+import 'package:nextsticker2/pages/flight_ticket.dart';
+import 'package:nextsticker2/pages/image_detection.dart';
+
 
 class Myself extends StatefulWidget {
   final Function openSnackBar;
@@ -386,7 +390,12 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
                           ),
                           const SizedBox(width: 12),
                           GestureDetector(
-                            onTap: () => widget.openSnackBar('火车票服务暂未开放', 2),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const TrainTicket(),
+                              ),
+                            ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
@@ -414,7 +423,12 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
                           ),
                           const SizedBox(width: 12),
                           GestureDetector(
-                            onTap: () => widget.openSnackBar('飞机票服务暂未开放', 2),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const FlightTicket(),
+                              ),
+                            ),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
@@ -440,6 +454,40 @@ class MyselfState extends State<Myself> with TickerProviderStateMixin {
                               ],
                             ),
                           ),
+                          const SizedBox(width: 12),
+                          GestureDetector(
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const ImageDetectionPage(),
+                              ),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    color: Colors.purple,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: const Icon(Icons.image_search, color: Colors.white, size: 32),
+                                ),
+                                const Text(
+                                  "图片检测",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black54,
+                                    height: 1.0,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
                         ],
                       ),
                     )

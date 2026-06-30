@@ -92,8 +92,6 @@ class MyPoState extends State<MyPo> {
 
   @override
   Widget build(BuildContext context) {
-    List trips = Provider.of<UserData>(context).trips;
-    bool loading = Provider.of<UserData>(context).loading;
 
     return Scaffold(
       body: widget.storys.isNotEmpty
@@ -116,10 +114,11 @@ class MyPoState extends State<MyPo> {
             );
         },
       )
-      :Center(
-        child: trips.isNotEmpty && !loading || !widget.netWorkIsOn
-        ? const Text("无内容！") 
-        : const CircularProgressIndicator()
+      :const Center(
+        child: Text(
+          "无内容",
+          style: TextStyle(fontSize: 16, color: Colors.grey),
+        )
       )
     );
   }

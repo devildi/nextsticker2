@@ -446,8 +446,11 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
   }
 
   void _onSubmitted(str) async{
+    debugPrint('=== MicroDetail _onSubmitted called with: "$str" ===');
     AuthModel auth = Provider.of<UserData>(context, listen: false).auth;
+    debugPrint('=== User UID: "${auth.uid}", Story ID: "${widget.articleFromStoryPage.articleId}" ===');
     await widget.comment(str, auth.uid ,widget.articleFromStoryPage.articleId, widget.index, widget.initUserData);
+    debugPrint('=== widget.comment completed ===');
     _textController.text = '';
     try{
       ArticleModel res = await StoryDao.getStoryByID(widget.articleFromStoryPage.articleId);
@@ -456,7 +459,7 @@ class MicroDetailState extends State<MicroDetail> with AutomaticKeepAliveClientM
       });
       toBottom();
     }catch(err){
-      debugPrint(err.toString());
+      debugPrint('=== Error in _onSubmitted getStoryByID: $err ===');
     }
   }
 

@@ -26,8 +26,11 @@ import io.flutter.embedding.engine.plugins.activity.ActivityAware;
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodChannel;
+import io.flutter.plugin.common.PluginRegistry;
+import android.Manifest;
+import android.content.pm.PackageManager;
 
-public class NativeViewPlgin implements FlutterPlugin, ActivityAware , OnPoiSearchListener{
+public class NativeViewPlgin implements FlutterPlugin, ActivityAware , OnPoiSearchListener, PluginRegistry.RequestPermissionsResultListener {
     private Activity activity;
     FlutterPluginBinding binding1;
 
@@ -74,10 +77,14 @@ public class NativeViewPlgin implements FlutterPlugin, ActivityAware , OnPoiSear
         Log.e("getActivity", "111getActivity");
     }
 
+    private ActivityPluginBinding activityBinding;
+
     @Override
     public void onAttachedToActivity( ActivityPluginBinding binding) {
         Log.e("getActivity", "onAttachedToActivity");
         activity = binding.getActivity();
+        activityBinding = binding;
+        activityBinding.addRequestPermissionsResultListener(this);
         BinaryMessenger messenger = binding1.getBinaryMessenger();
         binding1.getPlatformViewRegistry()
                 .registerViewFactory(
@@ -99,16 +106,47 @@ public class NativeViewPlgin implements FlutterPlugin, ActivityAware , OnPoiSear
     @Override
     public void onDetachedFromActivityForConfigChanges() {
         Log.e("getActivity", "111getActivity");
+        if (activityBinding != null) {
+            activityBinding.removeRequestPermissionsResultListener(this);
+            activityBinding = null;
+        }
     }
 
     @Override
     public void onReattachedToActivityForConfigChanges( ActivityPluginBinding binding) {
         Log.e("getActivity", "222getActivity");
+        activity = binding.getActivity();
+        activityBinding = binding;
+        activityBinding.addRequestPermissionsResultListener(this);
     }
 
     @Override
     public void onDetachedFromActivity() {
         Log.e("getActivity", "333getActivity");
+        if (activityBinding != null) {
+            activityBinding.removeRequestPermissionsResultListener(this);
+            activityBinding = null;
+        }
+    }
+
+    @Override
+    public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        if (requestCode == 1) {
+            boolean granted = false;
+            for (int i = 0; i < permissions.length; i++) {
+                if (Manifest.permission.ACCESS_COARSE_LOCATION.equals(permissions[i]) 
+                    || Manifest.permission.ACCESS_FINE_LOCATION.equals(permissions[i])) {
+                    if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                        granted = true;
+                    }
+                }
+            }
+            if (granted && binding1 != null) {
+                MethodChannel nativeChannel = new MethodChannel(binding1.getBinaryMessenger(), "gaode_native_channel");
+                nativeChannel.invokeMethod("permissionGranted", null);
+            }
+        }
+        return false;
     }
 
     @Override

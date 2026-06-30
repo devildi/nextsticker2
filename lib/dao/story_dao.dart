@@ -139,34 +139,52 @@ class StoryDao{
   }
 
   static Future clickLike(data)async {
-    final String storyId = data['id'];
+    final String storyId = data['articleId'] ?? data['id'] ?? '';
     final String uid = data['uid'];
+    
+    ArticleModel? updatedStory;
+    
+    // 1. Try to sync to server
+    try {
+      updatedStory = await clickLikeOnServer({
+        'type': data['type'] ?? 'like',
+        'uid': uid,
+        'articleId': storyId,
+      });
+    } catch (e) {
+      debugPrint('Sync like to server failed: $e');
+    }
+    
+    // 2. Fallback to local logic if server call failed or returned null
     final stories = await _loadLocalStories();
     final idx = stories.indexWhere((s) => s.articleId == storyId);
     if (idx != -1) {
-      final story = stories[idx];
-      final likes = List<AuthModel>.from(story.likes);
-      final userIdx = likes.indexWhere((u) => u.uid == uid);
-      
-      if (userIdx != -1) {
-        likes.removeAt(userIdx);
+      if (updatedStory != null) {
+        stories[idx] = updatedStory;
       } else {
-        final AuthModel currentAuth = await _getCurrentAuthUser();
-        final AuthModel likeUser = currentAuth.uid == uid 
-            ? currentAuth 
-            : AuthModel(
-                uid: uid, 
-                name: 'User', 
-                like: [], comment: [], collect: [], follow: [], followed: []
-              );
-        likes.add(likeUser);
+        final story = stories[idx];
+        final likes = List<AuthModel>.from(story.likes);
+        final userIdx = likes.indexWhere((u) => u.uid == uid);
+        
+        if (userIdx != -1) {
+          likes.removeAt(userIdx);
+        } else {
+          final AuthModel currentAuth = await _getCurrentAuthUser();
+          final AuthModel likeUser = currentAuth.uid == uid 
+              ? currentAuth 
+              : AuthModel(
+                  uid: uid, 
+                  name: 'User', 
+                  like: [], comment: [], collect: [], follow: [], followed: []
+                );
+          likes.add(likeUser);
+        }
+        
+        final Map<String, dynamic> updatedMap = story.toJson();
+        updatedMap['likes'] = likes.map((e) => e.toJson()).toList();
+        updatedStory = ArticleModel.fromJson(updatedMap);
+        stories[idx] = updatedStory;
       }
-      
-      final Map<String, dynamic> updatedMap = story.toJson();
-      updatedMap['likes'] = likes.map((e) => e.toJson()).toList();
-      final updatedStory = ArticleModel.fromJson(updatedMap);
-      
-      stories[idx] = updatedStory;
       await _saveLocalStories(stories);
       return updatedStory;
     }
@@ -174,31 +192,50 @@ class StoryDao{
   }
 
   static Future poComment(data)async {
-    final String storyId = data['whichArticle'];
-    final String content = data['content'];
-    final String whoseContent = data['whoseContent'];
+    final String storyId = data['articleId'] ?? data['whichArticle'] ?? '';
+    final String content = data['content'] ?? '';
+    final String whoseContent = data['uid'] ?? data['whoseContent'] ?? '';
+    
+    ArticleModel? updatedStory;
+    
+    // 1. Try to sync to server
+    try {
+      updatedStory = await poCommentOnServer({
+        'content': content,
+        'uid': whoseContent,
+        'articleId': storyId,
+      });
+    } catch (e) {
+      debugPrint('Sync comment to server failed: $e');
+    }
+    
+    // 2. Fallback to local logic if server call failed or returned null
     final stories = await _loadLocalStories();
     final idx = stories.indexWhere((s) => s.articleId == storyId);
     if (idx != -1) {
-      final story = stories[idx];
-      final comments = List<Comment>.from(story.comments);
-      
-      final AuthModel currentAuth = await _getCurrentAuthUser();
-      final AuthModel commentUser = currentAuth.uid == whoseContent 
-          ? currentAuth 
-          : AuthModel(
-              uid: whoseContent, 
-              name: 'User', 
-              like: [], comment: [], collect: [], follow: [], followed: []
-            );
-      
-      comments.add(Comment(content: content, whoseContent: commentUser));
-      
-      final Map<String, dynamic> updatedMap = story.toJson();
-      updatedMap['comments'] = comments.map((e) => e.toJson()).toList();
-      final updatedStory = ArticleModel.fromJson(updatedMap);
-      
-      stories[idx] = updatedStory;
+      if (updatedStory != null) {
+        stories[idx] = updatedStory;
+      } else {
+        final story = stories[idx];
+        final comments = List<Comment>.from(story.comments);
+        
+        final AuthModel currentAuth = await _getCurrentAuthUser();
+        final AuthModel commentUser = currentAuth.uid == whoseContent 
+            ? currentAuth 
+            : AuthModel(
+                uid: whoseContent, 
+                name: 'User', 
+                like: [], comment: [], collect: [], follow: [], followed: []
+              );
+        
+        comments.add(Comment(content: content, whoseContent: commentUser));
+        
+        final Map<String, dynamic> updatedMap = story.toJson();
+        updatedMap['comments'] = comments.map((e) => e.toJson()).toList();
+        updatedStory = ArticleModel.fromJson(updatedMap);
+        
+        stories[idx] = updatedStory;
+      }
       await _saveLocalStories(stories);
       return updatedStory;
     }

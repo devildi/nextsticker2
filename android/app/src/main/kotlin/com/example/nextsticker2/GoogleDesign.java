@@ -233,15 +233,10 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
     public void authority() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             if (context1.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                //如果应用之前请求过此权限但用户拒绝了请求，此方法将返回 true。
-                Log.e("quanxian", "权限");
-                if (ActivityCompat.shouldShowRequestPermissionRationale(activity1, Manifest.permission.ACCESS_COARSE_LOCATION)) {
-                    //这里可以写个对话框之类的项向用户解释为什么要申请权限，并在对话框的确认键后续再次申请权限.它在用户选择"不再询问"的情况下返回false
-
-                } else {
-                    //申请权限，字符串数组内是一个或多个要申请的权限，1是申请权限结果的返回参数，在onRequestPermissionsResult可以得知申请结果
-                    ActivityCompat.requestPermissions(activity1, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 1);
-                }
+                Log.e("quanxian", "请求定位权限");
+                android.content.SharedPreferences sharedPref = context1.getSharedPreferences("LocationCache", Context.MODE_PRIVATE);
+                sharedPref.edit().putBoolean("permission_requested", true).apply();
+                ActivityCompat.requestPermissions(activity1, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 1);
             }
         }
     }
@@ -254,7 +249,18 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
     public void onMethodCall(@NotNull MethodCall call, @NotNull MethodChannel.Result result) {
         if ("startLoaction".equals(call.method)) {
             Log.e("点击", call.method);
-            //locationOnce(activity1);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                if (context1.checkSelfPermission(Manifest.permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                    android.content.SharedPreferences sharedPref = context1.getSharedPreferences("LocationCache", Context.MODE_PRIVATE);
+                    boolean requestedBefore = sharedPref.getBoolean("permission_requested", false);
+                    if (requestedBefore && !ActivityCompat.shouldShowRequestPermissionRationale(activity1, Manifest.permission.ACCESS_COARSE_LOCATION)) {
+                        methodChannel.invokeMethod("alert", true);
+                    } else {
+                        sharedPref.edit().putBoolean("permission_requested", true).apply();
+                        ActivityCompat.requestPermissions(activity1, new String[]{Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION}, 1);
+                    }
+                }
+            }
         } else if ("findPOI".equals(call.method)) {
             String query = (String) call.arguments;
             Log.e("findPOI", query);
@@ -414,6 +420,15 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
         TextView contentTextView = nativeView.findViewById(R.id.contentTextView);
         titleTextView.setText(marker.getTitle());
         contentTextView.setText(marker.getSnippet());
+        
+        ImageView addIcon = nativeView.findViewById(R.id.addIcon);
+        String snippet = marker.getSnippet();
+        if (snippet == null || snippet.trim().isEmpty()) {
+            addIcon.setVisibility(View.VISIBLE);
+        } else {
+            addIcon.setVisibility(View.GONE);
+        }
+
         imageView = nativeView.findViewById(R.id.myImageView);
         String url = (String)marker.getTag();
         if (url == null || url.isEmpty()) {
