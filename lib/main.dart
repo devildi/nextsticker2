@@ -673,6 +673,20 @@ class _MyHomePageState extends State<MyHomePage> {
     return newArray;
   }
 
+  List flatDataWithDayIndex(List<DayDetail> array) {
+    List newArray = [];
+    if (array != null) {
+      for (int i = 0; i < array.length; i++) {
+        for (var point in array[i].dayList) {
+          var pointMap = point.toJson();
+          pointMap['dayIndex'] = i;
+          newArray.add(pointMap);
+        }
+      }
+    }
+    return newArray;
+  }
+
   _addToDayList(DetailModel item){
     TravelModel cloneTrip = Provider.of<UserData>(context, listen: false).cloneData;
     item.category = 0;
@@ -1102,7 +1116,7 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   void inJectToIOS(userData){
-    String string = json.encode(flatData(userData.detail).map((i) => i.toJson()).toList());
+    String string = json.encode(flatDataWithDayIndex(userData.detail));
     platform.invokeMethod('InjectData', string);
   }
 
@@ -1357,7 +1371,7 @@ class _MyHomePageState extends State<MyHomePage> {
               key: mapKey,
               domestic: inChina,
               openSnackBar: _openSnackBar, 
-              points: json.encode(flatData(userData.detail).map((i) => i.toJson()).toList()),
+              points: json.encode(flatDataWithDayIndex(userData.detail)),
               hotelPoints: json.encode(hotelData(flatData(userData.detail)).map((i) => i.toJson()).toList()),
               foodPoints: json.encode(foodData(flatData(userData.detail)).map((i) => i.toJson()).toList()),
               platform: platform,

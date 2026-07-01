@@ -188,10 +188,25 @@ public class RouteOverlay {
 
     }
 
+    protected float zIndex = 2.0f;
+    protected float customWidth = -1f;
+
+    public void setZIndex(float zIndex) {
+        this.zIndex = zIndex;
+    }
+
+    public void setCustomWidth(float width) {
+        this.customWidth = width;
+    }
+
     protected void addPolyLine(PolylineOptions options) {
         if(options == null) {
             return;
         }
+        if (customWidth > 0) {
+            options.width(customWidth);
+        }
+        options.zIndex(zIndex);
         Polyline polyline = mAMap.addPolyline(options);
         // Log.e("DriveRouteResult", "显示折线");
         if(polyline != null) {

@@ -11,6 +11,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.location.Location;
 import android.net.Uri;
@@ -35,6 +36,7 @@ import com.amap.api.location.AMapLocationClientOption;
 import com.amap.api.location.AMapLocationListener;
 import com.amap.api.maps.AMap;
 import com.amap.api.maps.AMapOptions;
+import com.amap.api.maps.AMapUtils;
 import com.amap.api.maps.CameraUpdateFactory;
 import com.amap.api.maps.MapView;
 import com.amap.api.maps.MapsInitializer;
@@ -66,6 +68,7 @@ import com.amap.api.services.route.RouteRailwayItem;
 import com.amap.api.services.route.RouteSearch;
 import com.amap.api.services.route.WalkPath;
 import com.amap.api.services.route.WalkRouteResult;
+import com.amap.api.services.route.WalkStep;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -107,6 +110,7 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     LatLonPoint departPoint = new LatLonPoint(0,0);
     LatLonPoint desPoint = null;
     public List<Polyline> PolyLines = new ArrayList<Polyline>();
+    public List<Polyline> navPolyLines = new ArrayList<Polyline>();
     ArrayList<Marker> trans = new ArrayList<Marker>();
     Boolean byTrain = false;
     public AMapLocationClient mLocationClient = null;
@@ -311,16 +315,37 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
         aMap.setMyLocationStyle(myLocationStyle);
     }
 
+    private static class PoiInfo {
+        LatLng latLng;
+        int dayIndex;
+        PoiInfo(LatLng latLng, int dayIndex) {
+            this.latLng = latLng;
+            this.dayIndex = dayIndex;
+        }
+    }
+
     private void initData(String jsonData) {
         Log.e("map","开始渲染点坐标");
+        trans.clear();
+        PolyLines.clear();
+        navPolyLines.clear();
+        List<PoiInfo> validPois = new ArrayList<>();
         try{
             JSONArray jsonArray = new JSONArray(jsonData);
+            int currentDay = -1;
+            int scenicCounter = 1;
             for (int i=0; i < jsonArray.length(); i++)    {
                 try {
                     JSONObject jsonObject = jsonArray.getJSONObject(i);
                     String nameOfScence = jsonObject.optString("nameOfScence", "");
                     int category = jsonObject.optInt("category", 0);
                     boolean done = jsonObject.optBoolean("done", false);
+                    int dayIndex = jsonObject.optInt("dayIndex", 0);
+
+                    if (dayIndex != currentDay) {
+                        currentDay = dayIndex;
+                        scenicCounter = 1;
+                    }
 
                     String latStr = jsonObject.optString("latitude", "");
                     String lonStr = jsonObject.optString("longitude", "");
@@ -342,10 +367,16 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                     MarkerOptions markerOptions = new MarkerOptions();
                     if(category == 0){
                         if(!done){
-                            markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.location));
+                            Bitmap numberedBitmap = drawNumberOnMarker(context1, R.drawable.location, String.valueOf(i + 1));
+                            if (numberedBitmap != null) {
+                                markerOptions.icon(BitmapDescriptorFactory.fromBitmap(numberedBitmap));
+                            } else {
+                                markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.location));
+                            }
                         } else {
                             markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.amap_through));
                         }
+                        scenicCounter++;
                     } else if(category == 1){
                         markerOptions.icon(BitmapDescriptorFactory.fromResource(R.drawable.hotel));
                     } else if(category == 2){
@@ -357,12 +388,245 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                     markerOptions.visible(hasCoords);
                     Marker marker = aMap.addMarker(markerOptions);
                     pointsArray.add(marker);
+
+                    if (hasCoords) {
+                        validPois.add(new PoiInfo(latLng, dayIndex));
+                    }
                 } catch(Exception e) {
                     Log.e("amap", "渲染单个点坐标异常: " + e.getMessage());
                 }
             }
         } catch(Exception e){
             Log.e("amap", "渲染点坐标异常: " + e.getMessage());
+        }
+        drawWalkRoutes(validPois);
+    }
+
+    private static class RouteSegment {
+        LatLng start;
+        LatLng end;
+        int color;
+        RouteSegment(LatLng start, LatLng end, int color) {
+            this.start = start;
+            this.end = end;
+            this.color = color;
+        }
+    }
+
+    private void drawWalkRoutes(List<PoiInfo> validPois) {
+        if (validPois == null || validPois.size() < 2) {
+            return;
+        }
+        List<RouteSegment> segmentsToQuery = new ArrayList<>();
+        int segmentIndex = 0;
+        for (int i = 1; i < validPois.size(); i++) {
+            PoiInfo prev = validPois.get(i - 1);
+            PoiInfo curr = validPois.get(i);
+            
+            if (prev.dayIndex == curr.dayIndex) {
+                float distance = AMapUtils.calculateLineDistance(prev.latLng, curr.latLng);
+                if (distance <= 2000) {
+                    int color = (segmentIndex % 2 == 0) ? Color.parseColor("#4CAF50") : Color.parseColor("#2196F3");
+                    segmentsToQuery.add(new RouteSegment(prev.latLng, curr.latLng, color));
+                    segmentIndex++;
+                } else {
+                    Log.w("WalkingRoute", "两点直线距离过大，跳过查询请求。坐标1：" + prev.latLng + "，坐标2：" + curr.latLng + "，直线距离：" + distance + "米 (限制2000米)");
+                }
+            } else {
+                segmentIndex = 0;
+            }
+        }
+
+        // 串行队列依次处理，防QPS超限
+        processRouteSegmentsQueue(segmentsToQuery, 0);
+    }
+
+    private void processRouteSegmentsQueue(final List<RouteSegment> segments, final int index) {
+        if (segments == null || index >= segments.size()) {
+            Log.i("WalkingRoute", "所有待查询的步行路线处理完毕。");
+            return;
+        }
+
+        final RouteSegment segment = segments.get(index);
+        queryAndDrawWalkRoute(segment.start, segment.end, segment.color, new Runnable() {
+            @Override
+            public void run() {
+                // 回调完成后，主线程延迟 350ms 发送下一个请求，规避 QPS 并发峰值限制
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        processRouteSegmentsQueue(segments, index + 1);
+                    }
+                }, 350);
+            }
+        });
+    }
+
+    private void queryAndDrawWalkRoute(final LatLng start, final LatLng end, final int routeColor, final Runnable callback) {
+        try {
+            RouteSearch routeSearch = new RouteSearch(context1);
+            Log.i("WalkingRoute", "发起高德步行路线查询：" + start + " -> " + end);
+            routeSearch.setRouteSearchListener(new RouteSearch.OnRouteSearchListener() {
+                @Override
+                public void onBusRouteSearched(BusRouteResult result, int errorCode) {}
+
+                @Override
+                public void onDriveRouteSearched(DriveRouteResult result, int errorCode) {}
+
+                @Override
+                public void onWalkRouteSearched(WalkRouteResult result, int errorCode) {
+                    try {
+                        if (errorCode == AMapException.CODE_AMAP_SUCCESS && result != null && result.getPaths() != null) {
+                            if (result.getPaths().size() > 0) {
+                                WalkPath walkPath = result.getPaths().get(0);
+                                if (walkPath != null) {
+                                    Log.i("WalkingRoute", "高德步行路线返回成功。实际距离：" + walkPath.getDistance() + "米");
+                                    if (walkPath.getDistance() <= 2000) {
+                                        WalkRouteOverlay walkRouteOverlay = new WalkRouteOverlay(
+                                                context1, aMap, walkPath,
+                                                result.getStartPos(),
+                                                result.getTargetPos());
+                                        walkRouteOverlay.setCustomColor(routeColor);
+                                        walkRouteOverlay.setNodeIconVisibility(false);
+                                        walkRouteOverlay.setCustomWidth(14f); // Thinner day routes
+                                        walkRouteOverlay.setZIndex(2.0f);     // High priority
+                                        walkRouteOverlay.addToMap();
+                                        add(PolyLines, walkRouteOverlay.allPolyLines);
+
+                                        // 计算折线的中点
+                                        List<LatLng> allPoints = new ArrayList<>();
+                                        for (WalkStep step : walkPath.getSteps()) {
+                                            allPoints.addAll(AMapServicesUtil.convertArrList(step.getPolyline()));
+                                        }
+                                        LatLng midLatLng;
+                                        if (!allPoints.isEmpty()) {
+                                            midLatLng = allPoints.get(allPoints.size() / 2);
+                                        } else {
+                                            midLatLng = new LatLng((start.latitude + end.latitude) / 2, (start.longitude + end.longitude) / 2);
+                                        }
+
+                                        // 生成并绘制包含距离文本的 Marker
+                                        int distance = (int) walkPath.getDistance();
+                                        Bitmap textBitmap = drawTextToBitmap(context1, distance + "米");
+                                        if (textBitmap != null) {
+                                            Marker textMarker = aMap.addMarker(new MarkerOptions()
+                                                    .position(midLatLng)
+                                                    .anchor(0.5f, 0.5f)
+                                                    .icon(BitmapDescriptorFactory.fromBitmap(textBitmap)));
+                                            trans.add(textMarker);
+                                        }
+                                    } else {
+                                        Log.w("WalkingRoute", "路线实际步行距离过大，跳过绘制。实际距离：" + walkPath.getDistance() + "米 (限制2000米)");
+                                    }
+                                } else {
+                                    Log.e("WalkingRoute", "高德步行路线返回的 walkPath 为 null");
+                                }
+                            } else {
+                                Log.w("WalkingRoute", "高德步行路线返回结果成功，但未包含任何路径");
+                            }
+                        } else {
+                            Log.e("WalkingRoute", "高德步行路线查询失败，错误码：" + errorCode);
+                        }
+                    } catch (Exception e) {
+                        Log.e("WalkingRoute", "处理高德步行路线查询结果异常: " + e.getMessage());
+                    } finally {
+                        if (callback != null) {
+                            callback.run();
+                        }
+                    }
+                }
+
+                @Override
+                public void onRideRouteSearched(RideRouteResult result, int errorCode) {}
+            });
+
+            LatLonPoint startPoint = new LatLonPoint(start.latitude, start.longitude);
+            LatLonPoint endPoint = new LatLonPoint(end.latitude, end.longitude);
+            RouteSearch.FromAndTo fromAndTo = new RouteSearch.FromAndTo(startPoint, endPoint);
+            RouteSearch.WalkRouteQuery query = new RouteSearch.WalkRouteQuery(fromAndTo, RouteSearch.WalkDefault);
+            routeSearch.calculateWalkRouteAsyn(query);
+        } catch (Exception e) {
+            Log.e("WalkingRoute", "查询步行路线发生异常: " + e.getMessage());
+            if (callback != null) {
+                callback.run();
+            }
+        }
+    }
+
+    private Bitmap drawTextToBitmap(Context context, String text) {
+        try {
+            float scale = context.getResources().getDisplayMetrics().density;
+            android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.BLACK);
+            paint.setTextSize((int) (11 * scale)); // 11sp
+            
+            android.graphics.Rect bounds = new android.graphics.Rect();
+            paint.getTextBounds(text, 0, text.length(), bounds);
+            
+            int padding = (int) (4 * scale);
+            int width = bounds.width() + padding * 2;
+            int height = bounds.height() + padding * 2;
+            
+            Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+            
+            android.graphics.Paint bgPaint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            bgPaint.setColor(Color.WHITE);
+            bgPaint.setStyle(android.graphics.Paint.Style.FILL);
+            
+            android.graphics.RectF rectF = new android.graphics.RectF(0, 0, width, height);
+            canvas.drawRoundRect(rectF, (int)(4 * scale), (int)(4 * scale), bgPaint);
+            
+            bgPaint.setColor(Color.parseColor("#666666"));
+            bgPaint.setStyle(android.graphics.Paint.Style.STROKE);
+            bgPaint.setStrokeWidth(1 * scale);
+            canvas.drawRoundRect(rectF, (int)(4 * scale), (int)(4 * scale), bgPaint);
+            
+            int x = padding;
+            int y = (height / 2) - (bounds.centerY());
+            canvas.drawText(text, x, y, paint);
+            
+            return bitmap;
+        } catch (Exception e) {
+            Log.e("amap", "Failed to generate text bitmap: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private Bitmap drawNumberOnMarker(Context context, int resourceId, String number) {
+        try {
+            android.graphics.BitmapFactory.Options options = new android.graphics.BitmapFactory.Options();
+            options.inMutable = true;
+            Bitmap bitmap = android.graphics.BitmapFactory.decodeResource(context.getResources(), resourceId, options);
+            if (bitmap == null) {
+                return null;
+            }
+            if (!bitmap.isMutable()) {
+                bitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+            }
+            
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bitmap);
+            float scale = context.getResources().getDisplayMetrics().density;
+            
+            android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(Color.BLACK);
+            paint.setTextSize((int) (9.5f * scale));
+            paint.setTypeface(android.graphics.Typeface.DEFAULT_BOLD);
+            
+            android.graphics.Rect bounds = new android.graphics.Rect();
+            paint.getTextBounds(number, 0, number.length(), bounds);
+            
+            int width = bitmap.getWidth();
+            int height = bitmap.getHeight();
+            
+            float x = (width - bounds.width()) / 2f - bounds.left;
+            float y = (height * 0.36f) - bounds.centerY();
+            
+            canvas.drawText(number, x, y, paint);
+            return bitmap;
+        } catch (Exception e) {
+            Log.e("amap", "Error drawing number on marker: " + e.getMessage());
+            return null;
         }
     }
 
@@ -453,7 +717,7 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                 }
             }
         } else {
-            remove(PolyLines, trans);
+            remove(navPolyLines, trans);
             aMap.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(depart.getLatitude(), depart.getLongitude()),16,30,0)));
             methodChannel.invokeMethod("clearInfor",null);
         }
@@ -474,7 +738,7 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
         byTrain = false;
         Log.e("BusRouteResult", "公交地铁结果");
         methodChannel.invokeMethod("stopLoadingRoute",true);
-        remove(PolyLines, trans);
+        remove(navPolyLines, trans);
         if (errorCode == AMapException.CODE_AMAP_SUCCESS) {
             if (result != null && result.getPaths() != null) {
                 if (result.getPaths().size() > 0) {
@@ -501,9 +765,10 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                             Polyline polyline =aMap.addPolyline(
                                     new PolylineOptions()
                                             .addAll(latLngs)
-                                            .width(30f)
+                                            .width(32f)
+                                            .zIndex(1.0f)
                                             .setCustomTexture(BitmapDescriptorFactory.fromResource(R.drawable.custtexture_slow)));
-                            PolyLines.add(polyline);
+                            navPolyLines.add(polyline);
                         }
                         List<RouteBusLineItem> busStopList = step.getBusLines();
                         if(busStopList.size() > 0){
@@ -543,14 +808,15 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                             Polyline polyline =aMap.addPolyline(
                                     new PolylineOptions()
                                             .addAll(latLngs)
-                                            .width(18f)
+                                            .width(32f)
+                                            .zIndex(1.0f)
                                             .setCustomTexture(BitmapDescriptorFactory.fromResource(R.drawable.custtexture)));
-                            PolyLines.add(polyline);
+                            navPolyLines.add(polyline);
                         }
 
                     }
                     if(byTrain){
-                        remove(PolyLines, trans);
+                        remove(navPolyLines, trans);
                         methodChannel.invokeMethod("aMapSearchRequestError","暂不提供跨城公交方案！");
                         return;
                     }
@@ -614,10 +880,12 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                             mDriveRouteResult.getTargetPos(), null);
                     drivingRouteOverlay.setNodeIconVisibility(false);//设置节点marker是否显示
                     drivingRouteOverlay.setIsColorfulline(true);//是否用颜色展示交通拥堵情况，默认true
+                    drivingRouteOverlay.setCustomWidth(32f); // Thicker navigation
+                    drivingRouteOverlay.setZIndex(1.0f);     // Underneath
                     //drivingRouteOverlay.removeFromMap();
-                    remove(PolyLines, trans);
+                    remove(navPolyLines, trans);
                     drivingRouteOverlay.addToMap();
-                    add(PolyLines, drivingRouteOverlay.allPolyLines);
+                    add(navPolyLines, drivingRouteOverlay.allPolyLines);
                     drivingRouteOverlay.zoomToSpan();
                     int dis = (int) drivePath.getDistance();
                     int dur = (int) drivePath.getDuration();
@@ -655,9 +923,11 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                             context1, aMap, walkPath,
                             mWalkRouteResult.getStartPos(),
                             mWalkRouteResult.getTargetPos());
-                    remove(PolyLines, trans);
+                    walkRouteOverlay.setCustomWidth(32f); // Thicker navigation
+                    walkRouteOverlay.setZIndex(1.0f);     // Underneath
+                    remove(navPolyLines, trans);
                     walkRouteOverlay.addToMap();
-                    add(PolyLines, walkRouteOverlay.allPolyLines);
+                    add(navPolyLines, walkRouteOverlay.allPolyLines);
                     walkRouteOverlay.zoomToSpan();
                     int dis = (int) walkPath.getDistance();
                     int dur = (int) walkPath.getDuration();
@@ -693,10 +963,12 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                             mRideRouteResult.getStartPos(),
                             mRideRouteResult.getTargetPos());
                     rideRouteOverlay.setNodeIconVisibility(false);
+                    rideRouteOverlay.setCustomWidth(32f); // Thicker navigation
+                    rideRouteOverlay.setZIndex(1.0f);     // Underneath
 
-                    remove(PolyLines, trans);
+                    remove(navPolyLines, trans);
                     rideRouteOverlay.addToMap();
-                    add(PolyLines, rideRouteOverlay.allPolyLines);
+                    add(navPolyLines, rideRouteOverlay.allPolyLines);
                     rideRouteOverlay.zoomToSpan();
 
                     int dis = (int) ridePath.getDistance();
@@ -1009,11 +1281,11 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
     }
 
     private void remove(List<Polyline> Polylines, List<Marker> markers){
-        if(PolyLines.size() > 0){
-            for (Polyline line : PolyLines) {
+        if(Polylines.size() > 0){
+            for (Polyline line : Polylines) {
                 line.remove();
             }
-            PolyLines.clear();
+            Polylines.clear();
         }
         if(markers.size() > 0){
             for (Marker marker : markers) {

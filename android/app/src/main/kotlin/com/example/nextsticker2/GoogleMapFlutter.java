@@ -85,6 +85,7 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
     Marker destination = null;
     LatLng depart = null;
     List<Polyline> polyLines = new ArrayList<Polyline>();
+    List<Polyline> navPolyLines = new ArrayList<Polyline>();
     ArrayList<Marker> trans = new ArrayList<Marker>();
     List<PolylineOptions> polyLinesArray = new ArrayList<PolylineOptions>();
     List<MarkerOptions> markerOptionsArray = new ArrayList<MarkerOptions>();
@@ -325,6 +326,8 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
             if (pointsArray.size() > 0) {
                 map.clear();
                 pointsArray.clear();
+                polyLines.clear();
+                navPolyLines.clear();
             };
             initData(text);
         } else if ("setDestination".equals(call.method)) {
@@ -350,6 +353,8 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
 
         } else if ("clear".equals(call.method)) {
             map.clear();
+            polyLines.clear();
+            navPolyLines.clear();
         } else if ("notification".equals(call.method)) {
             String text = (String) call.arguments;
             try{
@@ -543,7 +548,7 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
     public void onMyLocationClick(@NotNull Location location) {
         Log.e("点击","自己");
         //Toast.makeText(context1, "Current location:\n" + location, Toast.LENGTH_LONG).show();
-        remove(polyLines, trans, polyLinesArray, markerOptionsArray);
+        remove(navPolyLines, trans, polyLinesArray, markerOptionsArray);
         map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(location.getLatitude(), location.getLongitude()), 15));
         depart = new LatLng(location.getLatitude(),location.getLongitude());
         methodChannel.invokeMethod("clearInfor",null);
@@ -571,7 +576,7 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
                 }
             }
         } else {
-            remove(polyLines, trans, polyLinesArray, markerOptionsArray);
+            remove(navPolyLines, trans, polyLinesArray, markerOptionsArray);
             //map.animateCamera(CameraUpdateFactory.newCameraPosition(new CameraPosition(new LatLng(depart.getLatitude(), depart.getLongitude()), 16,30,0)));
             methodChannel.invokeMethod("clearInfor",null);
         }
@@ -629,7 +634,7 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
     }
 
     private void genRoute(String text) throws IOException {
-        remove(polyLines, trans, polyLinesArray, markerOptionsArray);
+        remove(navPolyLines, trans, polyLinesArray, markerOptionsArray);
         methodChannel.invokeMethod("isLoadingRoute",true);
         String Url = getURL(text, depart, destination);
         Log.e("router",text);
@@ -790,7 +795,7 @@ class GoogleMapFlutter<MapActivity, FusedLocationProviderClient> extends AppComp
                         if(finalB != null){
                             for (int i =0 ; i < polyLinesArray.size(); i++){
                                 Polyline line = map.addPolyline(polyLinesArray.get(i));
-                                polyLines.add(line);
+                                navPolyLines.add(line);
                             }
                             for (int i =0 ; i < markerOptionsArray.size(); i++){
                                 Marker marker = map.addMarker(markerOptionsArray.get(i));

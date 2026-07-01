@@ -125,6 +125,12 @@ public class WalkRouteOverlay extends RouteOverlay {
                 .anchor(0.5f, 0.5f).icon(walkStationDescriptor));
     }
 
+    private int customColor = 0;
+
+    public void setCustomColor(int color) {
+        this.customColor = color;
+    }
+
     /**
      * 初始化线段属性
      */
@@ -137,7 +143,7 @@ public class WalkRouteOverlay extends RouteOverlay {
         mPolylineOptions = null;
 
         mPolylineOptions = new PolylineOptions();
-        mPolylineOptions.color(getWalkColor()).width(getRouteWidth());
+        mPolylineOptions.color(customColor != 0 ? customColor : getWalkColor()).width(getRouteWidth());
     }
 
 

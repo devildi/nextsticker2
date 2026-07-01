@@ -416,6 +416,23 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
     @Override
     public View getInfoWindow(@NonNull Marker marker) {
         View nativeView = LayoutInflater.from(context1).inflate(R.layout.infowindow, null);
+        int tempWidth = 0;
+        if (context1 != null) {
+            try {
+                int screenWidth = context1.getResources().getDisplayMetrics().widthPixels;
+                float density = context1.getResources().getDisplayMetrics().density;
+                int targetWidth = (int) (280 * density);
+                tempWidth = Math.min(targetWidth, (int) (screenWidth * 0.85));
+                android.view.ViewGroup.LayoutParams lp = new android.view.ViewGroup.LayoutParams(
+                    tempWidth,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+                );
+                nativeView.setLayoutParams(lp);
+            } catch (Exception e) {
+                Log.e("map", "设置 infowindow 宽度失败: " + e.getMessage());
+            }
+        }
+        final int finalWindowWidth = tempWidth;
         TextView titleTextView = nativeView.findViewById(R.id.titleTextView);
         TextView contentTextView = nativeView.findViewById(R.id.contentTextView);
         titleTextView.setText(marker.getTitle());
@@ -446,6 +463,17 @@ class GoogleDesign<MapActivity, FusedLocationProviderClient> extends AppCompatAc
                 public void onResponse(ImageLoader.ImageContainer response, boolean isImmediate) {
                     Bitmap bitmap = response.getBitmap();
                     if (bitmap != null) {
+                        if (finalWindowWidth > 0) {
+                            int finalHeight = (int) ((float) finalWindowWidth * bitmap.getHeight() / bitmap.getWidth());
+                            android.view.ViewGroup.LayoutParams lp = imageView.getLayoutParams();
+                            if (lp == null) {
+                                lp = new android.view.ViewGroup.LayoutParams(finalWindowWidth, finalHeight);
+                            } else {
+                                lp.width = finalWindowWidth;
+                                lp.height = finalHeight;
+                            }
+                            imageView.setLayoutParams(lp);
+                        }
                         imageView.setImageBitmap(bitmap);
                         // If the load was asynchronous (not immediate), refresh the info window
                         if (!isImmediate && marker.isInfoWindowShown()) {

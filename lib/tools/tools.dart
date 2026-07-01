@@ -590,56 +590,58 @@ class CommonUtils {
                             ],
                           ],
                           const SizedBox(height: 24.0),
-                          if (onDelete != null) ...[
-                            SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton(
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(color: Colors.red.shade400),
-                                  foregroundColor: Colors.red.shade600,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12.0),
+                          Row(
+                            children: [
+                              if (onDelete != null) ...[
+                                Expanded(
+                                  child: OutlinedButton(
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(color: Colors.red.shade400),
+                                      foregroundColor: Colors.red.shade600,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12.0),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(vertical: 14.0),
+                                    ),
+                                    onPressed: () {
+                                      Navigator.of(context).pop();
+                                      onDelete();
+                                    },
+                                    child: const Text(
+                                      '删除行程',
+                                      style: TextStyle(
+                                        fontSize: 14.0,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 1.0,
+                                      ),
+                                    ),
                                   ),
-                                  padding: const EdgeInsets.symmetric(vertical: 14.0),
                                 ),
-                                onPressed: () {
-                                  Navigator.of(context).pop();
-                                  onDelete();
-                                },
-                                child: const Text(
-                                  '删除行程',
-                                  style: TextStyle(
-                                    fontSize: 14.0,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.0,
+                                const SizedBox(width: 12.0),
+                              ],
+                              Expanded(
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.blue.shade600,
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12.0),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(vertical: 14.0),
+                                  ),
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text(
+                                    '关闭概览',
+                                    style: TextStyle(
+                                      fontSize: 14.0,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.0,
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(height: 12.0),
-                          ],
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.blue.shade600,
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12.0),
-                                ),
-                                padding: const EdgeInsets.symmetric(vertical: 14.0),
-                              ),
-                              onPressed: () => Navigator.of(context).pop(),
-                              child: const Text(
-                                '关闭概览',
-                                style: TextStyle(
-                                  fontSize: 14.0,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.0,
-                                ),
-                              ),
-                            ),
+                            ],
                           ),
                         ],
                       ),

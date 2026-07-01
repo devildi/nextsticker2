@@ -65,6 +65,7 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
     private Marker marker;
 
     boolean flag;
+    private int finalWindowWidth = 0;
 
     GaodeDesign(Context context, BinaryMessenger messenger, int id, Map<String, Object> creationParams, Activity activity) {
         MapsInitializer.updatePrivacyShow(context,true,true);
@@ -72,6 +73,20 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
         ServiceSettings.updatePrivacyShow(context,true,true);
         ServiceSettings.updatePrivacyAgree(context,true);
         nativeView = LayoutInflater.from(context).inflate(R.layout.infowindow, null);
+        try {
+            int screenWidth = context.getResources().getDisplayMetrics().widthPixels;
+            float density = context.getResources().getDisplayMetrics().density;
+            int targetWidth = (int) (280 * density);
+            int finalWidth = Math.min(targetWidth, (int) (screenWidth * 0.85));
+            finalWindowWidth = finalWidth;
+            android.view.ViewGroup.LayoutParams lp = new android.view.ViewGroup.LayoutParams(
+                finalWidth,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            nativeView.setLayoutParams(lp);
+        } catch (Exception e) {
+            Log.e("map", "设置 infowindow 宽度失败: " + e.getMessage());
+        }
         methodChannel = new MethodChannel(messenger, "gaode_native_channel");
         MethodChannelManager.register(methodChannel, this);
         context1 = context;
@@ -273,6 +288,17 @@ class GaodeDesign  extends AppCompatActivity implements PlatformView, MethodChan
                 public void onResponse(ImageLoader.ImageContainer response, boolean isImmediate) {
                     Bitmap bitmap = response.getBitmap();
                     if (bitmap != null) {
+                        if (finalWindowWidth > 0) {
+                            int finalHeight = (int) ((float) finalWindowWidth * bitmap.getHeight() / bitmap.getWidth());
+                            android.view.ViewGroup.LayoutParams lp = imageView.getLayoutParams();
+                            if (lp == null) {
+                                lp = new android.view.ViewGroup.LayoutParams(finalWindowWidth, finalHeight);
+                            } else {
+                                lp.width = finalWindowWidth;
+                                lp.height = finalHeight;
+                            }
+                            imageView.setLayoutParams(lp);
+                        }
                         imageView.setImageBitmap(bitmap);
                         // If the load was asynchronous (not immediate), refresh the info window
                         if (!isImmediate && marker.isInfoWindowShown()) {

@@ -53,6 +53,8 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
   int _totalQueueLength = 0;
   int _currentQueueIndex = 0;
   String? _currentSearchingSpot;
+  String? _searchCity;
+  String _lastSearchKeyword = '';
 
   @override
   void initState() {
@@ -220,12 +222,17 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    // 离开页面时清零搜索结果（points）并清除地图标注
+    _userData?.setPoints([]);
+    try {
+      widget.platform.invokeMethod('clearPOI');
+    } catch (_) {}
     _userData?.removeListener(_onUserDataChanged);
     WidgetsBinding.instance.removeObserver(this);
     _searchFocusNode.dispose();
     _expandTimer?.cancel();
-    super.dispose();
     _controller.dispose();
+    super.dispose();
   }
 
   @override
@@ -332,6 +339,45 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
     }
   }
 
+  Future<void> _showCityInputDialog() async {
+    final TextEditingController cityController = TextEditingController(text: _searchCity);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('输入城市，缩小搜索范围'),
+        content: TextField(
+          controller: cityController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '例如：北京市',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(cityController.text.trim()),
+            child: const Text('确定'),
+          ),
+        ],
+      ),
+    );
+
+    if (result != null) {
+      if (result != _searchCity) {
+        setState(() {
+          _searchCity = result;
+        });
+        fedback('城市已设置为: $result');
+        if (_lastSearchKeyword.isNotEmpty) {
+          _onSubmit(_lastSearchKeyword);
+        }
+      }
+    }
+  }
+
   void _onSubmit(str)async {
     final String text = (str as String).trim();
     if (text.isEmpty) return;
@@ -355,7 +401,12 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
         }
       });
     } else {
-      await widget.platform.invokeMethod('findPOI', text);
+      _lastSearchKeyword = text;
+      String searchKeyword = text;
+      if (_searchCity != null && _searchCity!.isNotEmpty) {
+        searchKeyword = '$_searchCity$searchKeyword';
+      }
+      await widget.platform.invokeMethod('findPOI', searchKeyword);
       _controller.text = '';
       if (!context.mounted) return;
       Provider.of<UserData>(context, listen: false).setLoading(true);
@@ -843,7 +894,28 @@ class MapDesignState extends State<MapDesign> with WidgetsBindingObserver {
               right: 5,
               left: 5,
               top: 50,
-              child: Wrap(children: chips(points as List<DetailModel>, widget.platform, true)),
+              child: Wrap(
+                children: [
+                  ...chips(points as List<DetailModel>, widget.platform, true),
+                  GestureDetector(
+                    onTap: _showCityInputDialog,
+                    child: Container(
+                      margin: const EdgeInsets.fromLTRB(0, 0, 5, 0),
+                      child: Chip(
+                        label: Text(
+                          (_searchCity == null || _searchCity!.isEmpty)
+                              ? "搜索结果不准？"
+                              : _searchCity!,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        backgroundColor: (_searchCity == null || _searchCity!.isEmpty)
+                            ? Colors.red
+                            : Colors.green,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             )
             :Container(),
             Positioned(
