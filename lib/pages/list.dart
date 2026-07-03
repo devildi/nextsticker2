@@ -576,34 +576,68 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
     });
   }
 
-  void deleteTrip(TravelModel trip) async{
-    bool? confirm = await showDialog(
+  void _manageTrip(TravelModel trip) async {
+    String? action = await showDialog<String>(
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('删除行程'),
-          content: const Text('你确定要删除这个行程吗？'),
+          title: const Text('操作行程'),
+          content: const Text('请选择您要对该行程执行的操作：'),
           actions: [
             TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('取消'),
+              onPressed: () => Navigator.of(context).pop('edit'),
+              child: const Text('修改行程'),
             ),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('删除'),
+              onPressed: () => Navigator.of(context).pop('delete'),
+              child: const Text('删除', style: TextStyle(color: Colors.red)),
             ),
           ],
         );
       }
     );
 
-    if (confirm == true) {
-      await TravelDao.deleteTrip(trip.uid);
-      widget.reFresh();
+    if (action == 'edit') {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('行程已删除'))
+      Provider.of<UserData>(context, listen: false).setCloneData(trip.copy());
+      Navigator.push(context, MaterialPageRoute(
+        builder: (context) => MapDesign(
+          platform: widget.platform,
+          tripData: trip,
+          setTripData: widget.setTripData,
+          onRefreshList: widget.onRefresh,
+        )
+      ));
+    } else if (action == 'delete') {
+      if (!context.mounted) return;
+      bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) {
+          return AlertDialog(
+            title: const Text('删除行程'),
+            content: const Text('你确定要删除这个行程吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('删除'),
+              ),
+            ],
+          );
+        }
       );
+
+      if (confirm == true) {
+        await TravelDao.deleteTrip(trip.uid);
+        widget.reFresh();
+        if (!context.mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('行程已删除'))
+        );
+      }
     }
   }
 
@@ -652,7 +686,7 @@ class MyListState extends State<MyList> with AutomaticKeepAliveClientMixin{
                         "index": 1
                       });
                     },
-                    onLongPress: user.name == trips[index].designer? () => deleteTrip(trips[index]) : (){},
+                    onLongPress: user.name == trips[index].designer? () => _manageTrip(trips[index]) : (){},
                     child: Stack(
                       key: ValueKey(trips[index].uid),
                       children: <Widget>[

@@ -238,7 +238,10 @@ class FlightTicketState extends State<FlightTicket> {
   Future<void> _clearBackendCache() async {
     final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       await dio.post('${urlBase}api/flight/clear');
       debugPrint('Cleared flight cache on backend');
     } catch (e) {
@@ -249,7 +252,10 @@ class FlightTicketState extends State<FlightTicket> {
   Future<void> _checkStatus() async {
     final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       final response = await dio.get('${urlBase}api/flight/status');
       if (response.statusCode == 200 && response.data != null) {
         final bool running = response.data['isRunning'] ?? false;
@@ -583,7 +589,10 @@ class FlightTicketState extends State<FlightTicket> {
 
     _searchTriggered = true;
     try {
-      final stopDio = Dio();
+      final stopDio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       await stopDio.post('${urlBase}api/flight/stop');
     } catch (_) {}
 
@@ -607,7 +616,10 @@ class FlightTicketState extends State<FlightTicket> {
     final String retDateStr = "${_selectedDateRange.end.year}-${_selectedDateRange.end.month.toString().padLeft(2, '0')}-${_selectedDateRange.end.day.toString().padLeft(2, '0')}";
 
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 5000,
+        receiveTimeout: 5000,
+      ));
       final response = await dio.post(
         '${urlBase}api/flight/start',
         data: {
@@ -651,7 +663,10 @@ class FlightTicketState extends State<FlightTicket> {
   Future<void> _onCancel() async {
     final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       final response = await dio.post('${urlBase}api/flight/stop');
       if (response.statusCode == 200) {
         if (!mounted) return;

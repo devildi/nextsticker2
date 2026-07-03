@@ -269,7 +269,10 @@ class TrainTicketState extends State<TrainTicket> {
   Future<void> _clearBackendCache() async {
     final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       await dio.post('${urlBase}api/train/clear');
       debugPrint('Cleared train cache on backend');
     } catch (e) {
@@ -280,7 +283,10 @@ class TrainTicketState extends State<TrainTicket> {
   Future<void> _checkStatus() async {
     final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       final response = await dio.get('${urlBase}api/train/status');
       if (response.statusCode == 200 && response.data != null) {
         final bool running = response.data['isRunning'] ?? false;
@@ -520,7 +526,10 @@ class TrainTicketState extends State<TrainTicket> {
 
     _searchTriggered = true;
     try {
-      final stopDio = Dio();
+      final stopDio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       await stopDio.post('${urlBase}api/train/stop');
     } catch (_) {}
 
@@ -563,7 +572,10 @@ class TrainTicketState extends State<TrainTicket> {
     };
 
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 5000,
+        receiveTimeout: 5000,
+      ));
       final response = await dio.post(
         '${urlBase}api/train/start',
         data: {
@@ -607,7 +619,10 @@ class TrainTicketState extends State<TrainTicket> {
   Future<void> _onCancel() async {
     final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
     try {
-      final dio = Dio();
+      final dio = Dio(BaseOptions(
+        connectTimeout: 3000,
+        receiveTimeout: 3000,
+      ));
       final response = await dio.post('${urlBase}api/train/stop');
       if (response.statusCode == 200) {
         if (!mounted) return;

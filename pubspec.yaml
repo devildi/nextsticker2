@@ -60,7 +60,6 @@ dev_dependencies:
     sdk: flutter
   mockito: ^5.4.2
   build_runner: ^2.3.3
-  flutter_launcher_icons: ^0.13.1
 
   # The "flutter_lints" package below contains a set of recommended lints to
   # encourage good coding practices. The lint set provided by the package is
@@ -135,15 +134,10 @@ flutter_native_splash:
   ios_content_mode: scaleToFill    # iOS强制填充
   fullscreen: true                 # 全屏模式（隐藏状态栏）
 
+  # Android 12+ 特殊配置
   # android_12:
   #   image: "assets/splash.png"     # 必须提供（否则用应用图标）
   #   color: "#FFFFFF"               # 必填背景色
   #   icon_background_color: "#FFFFFF"
   #   fullscreen: true
-  
-flutter_launcher_icons:
-  android: "launcher_icon"
-  ios: true
-  image_path: "assets/logo.png"
-  min_sdk_android: 21
   
