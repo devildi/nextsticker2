@@ -58,13 +58,12 @@ class FlightTicket extends StatefulWidget {
   FlightTicketState createState() => FlightTicketState();
 }
 
+DateTime _normalizeDate(DateTime d) => DateTime(d.year, d.month, d.day);
+
 class FlightTicketState extends State<FlightTicket> {
   final TextEditingController _fromCtrl = TextEditingController(text: '沈阳');
 
-  DateTimeRange _selectedDateRange = DateTimeRange(
-    start: DateTime.now().add(const Duration(days: 1)),
-    end: DateTime.now().add(const Duration(days: 5)),
-  );
+  late DateTimeRange _selectedDateRange;
 
   late io.Socket _socket;
   final List<FlightResult> _results = [];
@@ -82,6 +81,11 @@ class FlightTicketState extends State<FlightTicket> {
   @override
   void initState() {
     super.initState();
+    final today = _normalizeDate(DateTime.now());
+    _selectedDateRange = DateTimeRange(
+      start: today.add(const Duration(days: 1)),
+      end: today.add(const Duration(days: 5)),
+    );
     _initSocket();
     _checkStatus();
   }
@@ -89,7 +93,7 @@ class FlightTicketState extends State<FlightTicket> {
   void _initSocket() {
     final String socketUrl = CommonUtils.developmentMode 
         ? '${CommonUtils.wsLan}?type=flight' 
-        : 'https://nextsticker.cn?type=flight';
+        : '${CommonUtils.wsDomainName}?type=flight';
     debugPrint('Connecting to socket: $socketUrl');
     
     _socket = io.io(socketUrl, <String, dynamic>{
@@ -236,7 +240,7 @@ class FlightTicketState extends State<FlightTicket> {
   }
 
   Future<void> _clearBackendCache() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: 3000,
@@ -250,7 +254,7 @@ class FlightTicketState extends State<FlightTicket> {
   }
 
   Future<void> _checkStatus() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: 3000,
@@ -273,10 +277,9 @@ class FlightTicketState extends State<FlightTicket> {
               final retDateStr = activeTask['returnDate'];
               if (depDateStr != null && retDateStr != null) {
                 try {
-                  _selectedDateRange = DateTimeRange(
-                    start: DateTime.parse(depDateStr),
-                    end: DateTime.parse(retDateStr),
-                  );
+                  final start = _normalizeDate(DateTime.parse(depDateStr));
+                  final end = _normalizeDate(DateTime.parse(retDateStr));
+                  _selectedDateRange = DateTimeRange(start: start, end: end);
                 } catch (_) {}
               }
 
@@ -335,8 +338,9 @@ class FlightTicketState extends State<FlightTicket> {
   }
 
   Future<void> _showCustomDateRangePicker() async {
-    DateTime tempStart = _selectedDateRange.start;
-    DateTime tempEnd = _selectedDateRange.end;
+    DateTime tempStart = _normalizeDate(_selectedDateRange.start);
+    DateTime tempEnd = _normalizeDate(_selectedDateRange.end);
+    bool isSelectingDeparture = true;
     DateTime? pickedStart;
     DateTime? pickedEnd;
 
@@ -347,6 +351,7 @@ class FlightTicketState extends State<FlightTicket> {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (context, setSheetState) {
+            final days = tempEnd.difference(tempStart).inDays + 1;
             return Container(
               height: MediaQuery.of(context).size.height * 0.85,
               decoration: const BoxDecoration(
@@ -355,72 +360,146 @@ class FlightTicketState extends State<FlightTicket> {
               ),
               child: Column(
                 children: [
+                  // Title Bar with Cancel and Confirm
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         TextButton(
                           onPressed: () => Navigator.pop(context),
-                          child: const Text('取消', style: TextStyle(color: Colors.grey)),
+                          child: const Text('取消', style: TextStyle(color: Colors.grey, fontSize: 16)),
                         ),
                         const Text(
-                          '选择日期',
+                          '选择往返日期',
                           style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF1A1A2E)),
                         ),
-                        TextButton(
+                        ElevatedButton(
                           onPressed: () {
                             pickedStart = tempStart;
                             pickedEnd = tempEnd;
                             Navigator.pop(context);
                           },
-                          child: const Text('确定', style: TextStyle(color: Color(0xFFE65100), fontWeight: FontWeight.bold)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE65100),
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                          ),
+                          child: const Text('确定', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                         ),
                       ],
                     ),
                   ),
-                  const Divider(height: 1),
+                  const Divider(height: 1, color: Color(0xFFEEEEEE)),
+
+                  // Selection Mode Indicator & Date Cards
                   Padding(
-                    padding: const EdgeInsets.all(16),
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
                     child: Row(
                       children: [
-                        _buildMiniDateCard('去程', tempStart, (d) => setSheetState(() {
-                          tempStart = d;
-                          if (tempEnd.isBefore(tempStart)) {
-                            tempEnd = tempStart.add(const Duration(days: 1));
-                          }
-                        })),
-                        const Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          child: Icon(Icons.arrow_forward, color: Colors.grey),
+                        // Departure Date Card
+                        _buildDateSelectionTab(
+                          label: '去程',
+                          date: tempStart,
+                          isSelected: isSelectingDeparture,
+                          onTap: () {
+                            setSheetState(() {
+                              isSelectingDeparture = true;
+                            });
+                          },
                         ),
-                        _buildMiniDateCard('返程', tempEnd, (d) => setSheetState(() {
-                          tempEnd = d;
-                          if (tempEnd.isBefore(tempStart)) {
-                            tempEnd = tempStart.add(const Duration(days: 1));
-                          }
-                        })),
+
+                        // Middle Duration Badge
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFFFF3E0),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: const Color(0xFFFFCC80), width: 0.5),
+                                ),
+                                child: Text(
+                                  '共$days天',
+                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              const Icon(Icons.arrow_forward, color: Colors.grey, size: 16),
+                            ],
+                          ),
+                        ),
+
+                        // Return Date Card
+                        _buildDateSelectionTab(
+                          label: '返程',
+                          date: tempEnd,
+                          isSelected: !isSelectingDeparture,
+                          onTap: () {
+                            setSheetState(() {
+                              isSelectingDeparture = false;
+                            });
+                          },
+                        ),
                       ],
                     ),
                   ),
+
+                  // Prompt Banner
+                  Container(
+                    width: double.infinity,
+                    margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF9F9F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          isSelectingDeparture ? Icons.flight_takeoff : Icons.flight_land,
+                          size: 16,
+                          color: const Color(0xFFE65100),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isSelectingDeparture ? '请在下方日历中点击选择「去程日期」' : '请在下方日历中点击选择「返程日期」',
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF666666), fontWeight: FontWeight.w500),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Calendar
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _DualCalendarWidget(
                         startDate: tempStart,
                         endDate: tempEnd,
-                        onStartChanged: (d) => setSheetState(() {
-                          tempStart = d;
-                          if (tempEnd.isBefore(tempStart)) {
-                            tempEnd = tempStart.add(const Duration(days: 1));
-                          }
-                        }),
-                        onEndChanged: (d) => setSheetState(() {
-                          tempEnd = d;
-                          if (tempEnd.isBefore(tempStart)) {
-                            tempEnd = tempStart.add(const Duration(days: 1));
-                          }
-                        }),
+                        isSelectingDeparture: isSelectingDeparture,
+                        onDateTap: (date) {
+                          setSheetState(() {
+                            if (isSelectingDeparture) {
+                              tempStart = date;
+                              if (tempEnd.isBefore(tempStart)) {
+                                tempEnd = tempStart.add(const Duration(days: 1));
+                              }
+                              isSelectingDeparture = false;
+                            } else {
+                              if (date.isBefore(tempStart)) {
+                                tempStart = date;
+                              } else {
+                                tempEnd = date;
+                              }
+                            }
+                          });
+                        },
                       ),
                     ),
                   ),
@@ -433,11 +512,12 @@ class FlightTicketState extends State<FlightTicket> {
     );
 
     if (pickedStart != null && pickedEnd != null) {
+      if (pickedEnd!.isBefore(pickedStart!)) {
+        pickedEnd = pickedStart;
+      }
       final duration = pickedEnd!.difference(pickedStart!).inDays;
-      if (duration < 2) {
-        pickedEnd = pickedStart!.add(const Duration(days: 2));
-      } else if (duration > 45) {
-        pickedEnd = pickedStart!.add(const Duration(days: 45));
+      if (duration > 60) {
+        pickedEnd = pickedStart!.add(const Duration(days: 60));
       }
       setState(() {
         _selectedDateRange = DateTimeRange(start: pickedStart!, end: pickedEnd!);
@@ -453,49 +533,70 @@ class FlightTicketState extends State<FlightTicket> {
     }
   }
 
-  Widget _buildMiniDateCard(String label, DateTime date, ValueChanged<DateTime> onTap) {
+  Widget _buildDateSelectionTab({
+    required String label,
+    required DateTime date,
+    required bool isSelected,
+    required VoidCallback onTap,
+  }) {
     return Expanded(
       child: GestureDetector(
-        onTap: () async {
-          final picked = await showDatePicker(
-            context: context,
-            initialDate: date,
-            firstDate: DateTime.now(),
-            lastDate: DateTime.now().add(const Duration(days: 90)),
-            helpText: '',
-            builder: (context, child) {
-              return Theme(
-                data: ThemeData.light().copyWith(
-                  colorScheme: const ColorScheme.light(
-                    primary: Color(0xFFE65100),
-                    onPrimary: Colors.white,
-                    surface: Colors.white,
-                    onSurface: Color(0xFF1A1A2E),
-                  ),
-                ),
-                child: child!,
-              );
-            },
-          );
-          if (picked != null) onTap(picked);
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFF3E0),
+            color: isSelected ? const Color(0xFFFFF3E0) : const Color(0xFFF7F8FA),
             borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected ? const Color(0xFFE65100) : Colors.transparent,
+              width: 1.5,
+            ),
           ),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: isSelected ? const Color(0xFFE65100) : Colors.grey,
+                    ),
+                  ),
+                  if (isSelected)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE65100),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '选择中',
+                        style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(height: 4),
               Text(
                 '${date.month}月${date.day}日',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFE65100)),
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? const Color(0xFFE65100) : const Color(0xFF1A1A2E),
+                ),
               ),
+              const SizedBox(height: 2),
               Text(
                 _getWeekday(date),
-                style: const TextStyle(fontSize: 12, color: Color(0xFFE65100)),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isSelected ? const Color(0xFFE65100) : Colors.grey,
+                ),
               ),
             ],
           ),
@@ -585,7 +686,7 @@ class FlightTicketState extends State<FlightTicket> {
   }
 
   Future<void> _onSearch() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
 
     _searchTriggered = true;
     try {
@@ -661,7 +762,7 @@ class FlightTicketState extends State<FlightTicket> {
   }
 
   Future<void> _onCancel() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: 3000,
@@ -1200,14 +1301,14 @@ class FlightTicketState extends State<FlightTicket> {
 class _DualCalendarWidget extends StatefulWidget {
   final DateTime startDate;
   final DateTime endDate;
-  final ValueChanged<DateTime> onStartChanged;
-  final ValueChanged<DateTime> onEndChanged;
+  final bool isSelectingDeparture;
+  final ValueChanged<DateTime> onDateTap;
 
   const _DualCalendarWidget({
     required this.startDate,
     required this.endDate,
-    required this.onStartChanged,
-    required this.onEndChanged,
+    required this.isSelectingDeparture,
+    required this.onDateTap,
   });
 
   @override
@@ -1223,8 +1324,8 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
-    final monthsSinceEpoch = (now.year * 12 + now.month) - (1970 * 12 + 1);
+    final initialMonth = widget.startDate;
+    final monthsSinceEpoch = (initialMonth.year * 12 + initialMonth.month) - (1970 * 12 + 1);
     _currentPage = monthsSinceEpoch;
     _pageController = PageController(initialPage: _currentPage);
   }
@@ -1240,12 +1341,7 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
     return DateTime(totalMonths ~/ 12, (totalMonths % 12) + 1);
   }
 
-  bool _isInRange(DateTime day) {
-    return !day.isBefore(widget.startDate) && !day.isAfter(widget.endDate);
-  }
-
-  bool _isStart(DateTime day) => day == widget.startDate;
-  bool _isEnd(DateTime day) => day == widget.endDate;
+  DateTime _normalize(DateTime d) => DateTime(d.year, d.month, d.day);
 
   @override
   Widget build(BuildContext context) {
@@ -1273,7 +1369,7 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Row(
           children: _weekdays.map((w) {
             final isWeekend = w == '六' || w == '日';
@@ -1291,7 +1387,7 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
             );
           }).toList(),
         ),
-        const Divider(height: 1, color: Color(0xFFEEEEEE)),
+        const Divider(height: 12, color: Color(0xFFEEEEEE)),
         Expanded(
           child: PageView.builder(
             controller: _pageController,
@@ -1309,7 +1405,7 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
     final firstDay = DateTime(month.year, month.month, 1);
     final lastDay = DateTime(month.year, month.month + 1, 0);
     final daysInMonth = lastDay.day;
-    final startWeekday = firstDay.weekday - 1;
+    final startWeekday = firstDay.weekday - 1; // 0 for Monday
 
     final List<Widget> cells = [];
 
@@ -1318,66 +1414,97 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
     }
 
     final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    final today = _normalize(now);
+    final normStart = _normalize(widget.startDate);
+    final normEnd = _normalize(widget.endDate);
 
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(month.year, month.month, day);
       final isPast = date.isBefore(today);
-      final inRange = _isInRange(date);
-      final isStart = _isStart(date);
-      final isEnd = _isEnd(date);
+      final isToday = date.isAtSameMomentAs(today);
+      final isStart = date.isAtSameMomentAs(normStart);
+      final isEnd = date.isAtSameMomentAs(normEnd);
+      final isSameDay = isStart && isEnd;
+      final isInRange = !date.isBefore(normStart) && !date.isAfter(normEnd);
 
       cells.add(
         GestureDetector(
-          onTap: isPast ? null : () {
-            if (date.isBefore(widget.startDate) ||
-                (date == widget.startDate && date == widget.endDate)) {
-              widget.onStartChanged(date);
-              widget.onEndChanged(date.add(const Duration(days: 1)));
-            } else if (date.isAfter(widget.endDate) || date == widget.endDate) {
-              widget.onEndChanged(date);
-            } else {
-              final distToStart = date.difference(widget.startDate).inDays;
-              final distToEnd = widget.endDate.difference(date).inDays;
-              if (distToStart <= distToEnd) {
-                widget.onStartChanged(date);
-              } else {
-                widget.onEndChanged(date);
-              }
-            }
-          },
-          child: Container(
-            margin: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              color: inRange ? const Color(0xFFFFF3E0) : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (isStart || isEnd)
-                  Container(
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE65100),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
-                Center(
-                  child: Text(
-                    '$day',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: isStart || isEnd ? FontWeight.bold : FontWeight.normal,
-                      color: isPast
-                          ? Colors.grey.shade300
-                          : isStart || isEnd
-                              ? Colors.white
-                              : const Color(0xFF1A1A2E),
-                    ),
+          behavior: HitTestBehavior.opaque,
+          onTap: isPast ? null : () => widget.onDateTap(date),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Range background connector band
+              if (isInRange && !isSameDay)
+                Positioned.fill(
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Container(
+                          color: isStart ? Colors.transparent : const Color(0xFFFFF3E0),
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          color: isEnd ? Colors.transparent : const Color(0xFFFFF3E0),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
+
+              // Day pill / button
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 2),
+                decoration: BoxDecoration(
+                  color: (isStart || isEnd) ? const Color(0xFFE65100) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '$day',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: (isStart || isEnd || isToday) ? FontWeight.bold : FontWeight.normal,
+                          color: isPast
+                              ? Colors.grey.shade300
+                              : (isStart || isEnd)
+                                  ? Colors.white
+                                  : isToday
+                                      ? const Color(0xFFE65100)
+                                      : const Color(0xFF1A1A2E),
+                        ),
+                      ),
+                      if (isSameDay)
+                        const Text(
+                          '去/返',
+                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                        )
+                      else if (isStart)
+                        const Text(
+                          '去程',
+                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                        )
+                      else if (isEnd)
+                        const Text(
+                          '返程',
+                          style: TextStyle(fontSize: 9, color: Colors.white, fontWeight: FontWeight.bold),
+                        )
+                      else if (isToday)
+                        const Text(
+                          '今天',
+                          style: TextStyle(fontSize: 9, color: Color(0xFFE65100), fontWeight: FontWeight.w500),
+                        )
+                      else
+                        const SizedBox(height: 11),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -1387,7 +1514,9 @@ class _DualCalendarWidgetState extends State<_DualCalendarWidget> {
       crossAxisCount: 7,
       physics: const NeverScrollableScrollPhysics(),
       shrinkWrap: true,
+      childAspectRatio: 0.88,
       mainAxisSpacing: 2,
+      crossAxisSpacing: 0,
       children: cells,
     );
   }

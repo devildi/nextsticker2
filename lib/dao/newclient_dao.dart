@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import 'package:nextsticker2/model/travel_model.dart';
 import 'package:nextsticker2/tools/tools.dart';
 
-String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
 
 String url = '${urlBase}api/users/newClient';
 String loginUrl = '${urlBase}api/users/login';

@@ -120,7 +120,7 @@ class TrainTicketState extends State<TrainTicket> {
   void _initSocket() {
     final String socketUrl = CommonUtils.developmentMode 
         ? '${CommonUtils.wsLan}?type=train' 
-        : 'https://nextsticker.cn?type=train';
+        : '${CommonUtils.wsDomainName}?type=train';
     debugPrint('Connecting to socket: $socketUrl');
     
     _socket = io.io(socketUrl, <String, dynamic>{
@@ -267,7 +267,7 @@ class TrainTicketState extends State<TrainTicket> {
   }
 
   Future<void> _clearBackendCache() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: 3000,
@@ -281,7 +281,7 @@ class TrainTicketState extends State<TrainTicket> {
   }
 
   Future<void> _checkStatus() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: 3000,
@@ -522,7 +522,7 @@ class TrainTicketState extends State<TrainTicket> {
   }
 
   Future<void> _onSearch() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
 
     _searchTriggered = true;
     try {
@@ -617,7 +617,7 @@ class TrainTicketState extends State<TrainTicket> {
   }
 
   Future<void> _onCancel() async {
-    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+    final String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
     try {
       final dio = Dio(BaseOptions(
         connectTimeout: 3000,

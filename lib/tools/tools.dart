@@ -7,9 +7,15 @@ import 'package:nextsticker2/model/travel_model.dart';
 
 class CommonUtils {
   static bool developmentMode = true;
-  static const String _lanHost = '10.59.186.50:4000';
+  static const String _lanHost = '10.136.56.50:4000';
+  //static const String domainName = 'https://nextsticker.cn/';
+  static const String _domainName = '100.96.128.127:4000';
   static const String lanUrl = 'http://$_lanHost/';
   static const String wsLan = 'ws://$_lanHost';
+
+  static const String domainName = 'http://$_domainName/';
+  static const String wsDomainName = 'ws://$_domainName';
+
   static Color randomColor() {
     List colors = [Colors.red[100], Colors.green[100], Colors.yellow[100], Colors.orange[100]];
     Random random = Random();

@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
 
 String urL = '${urlBase}api/trip/get?uid=';
 String urLForAllTrip = '${urlBase}api/trip/getAllTrip?';

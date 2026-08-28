@@ -8,7 +8,7 @@ import 'package:nextsticker2/tools/tools.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
-String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : "https://nextsticker.cn/";
+String urlBase = CommonUtils.developmentMode ? CommonUtils.lanUrl : CommonUtils.domainName;
 
 String urL = '${urlBase}api/trip/getAllStory?page=';
 String poMicroURL = '${urlBase}api/trip/newItem';
