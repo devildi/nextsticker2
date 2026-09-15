@@ -7,7 +7,7 @@ import 'package:nextsticker2/model/travel_model.dart';
 
 class CommonUtils {
   static bool developmentMode = true;
-  static const String _lanHost = '10.136.56.50:4000';
+  static const String _lanHost = '10.129.5.50:4000';
   //static const String domainName = 'https://nextsticker.cn/';
   static const String _domainName = '100.96.128.127:4000';
   static const String lanUrl = 'http://$_lanHost/';
