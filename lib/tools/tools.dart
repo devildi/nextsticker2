@@ -7,7 +7,7 @@ import 'package:nextsticker2/model/travel_model.dart';
 
 class CommonUtils {
   static bool developmentMode = true;
-  static const String _lanHost = '10.129.5.50:4000';
+  static const String _lanHost = '10.74.163.50:4000';
   //static const String domainName = 'https://nextsticker.cn/';
   static const String _domainName = '100.96.128.127:4000';
   static const String lanUrl = 'http://$_lanHost/';
@@ -191,7 +191,6 @@ class CommonUtils {
     int totalDays = travelData.detail.length;
     int totalLocations = 0;
     int completedLocations = 0;
-    int attractionsCount = 0;
     int hotelCount = 0;
     int foodCount = 0;
 
@@ -201,9 +200,7 @@ class CommonUtils {
         if (point.done) {
           completedLocations++;
         }
-        if (point.category == 0) {
-          attractionsCount++;
-        } else if (point.category == 1) {
+        if (point.category == 1) {
           hotelCount++;
         } else if (point.category == 2) {
           foodCount++;
@@ -304,6 +301,7 @@ class CommonUtils {
                             children: [
                               Text(
                                 travelData.tripName.isNotEmpty ? travelData.tripName : '我的旅行计划',
+                                maxLines: 1,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 22.0,
@@ -363,12 +361,16 @@ class CommonUtils {
                                   color: Colors.black87,
                                 ),
                               ),
-                              Text(
-                                '$completedLocations / $totalLocations 已打卡 ($completionPercentage%)',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: 12.0,
-                                  color: Colors.blue.shade700,
+                              const SizedBox(width: 8.0),
+                              Flexible(
+                                child: Text(
+                                  '$completedLocations / $totalLocations 已打卡 ($completionPercentage%)',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12.0,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
@@ -388,7 +390,7 @@ class CommonUtils {
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
                             crossAxisCount: 2,
-                            childAspectRatio: 2.2,
+                            childAspectRatio: 1.8,
                             mainAxisSpacing: 10.0,
                             crossAxisSpacing: 10.0,
                             children: [
@@ -556,12 +558,15 @@ class CommonUtils {
                                     '路线设计师: ',
                                     style: TextStyle(fontSize: 12.0, color: Colors.grey.shade600),
                                   ),
-                                  Text(
-                                    travelData.designer,
-                                    style: const TextStyle(
-                                      fontSize: 12.0,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.black87,
+                                  Expanded(
+                                    child: Text(
+                                      travelData.designer,
+                                      style: const TextStyle(
+                                        fontSize: 12.0,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                 ],
@@ -669,7 +674,7 @@ class CommonUtils {
     required String label,
   }) {
     return Container(
-      padding: const EdgeInsets.all(10.0),
+      padding: const EdgeInsets.symmetric(horizontal: 10.0, vertical: 8.0),
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
         borderRadius: BorderRadius.circular(16.0),
@@ -692,26 +697,38 @@ class CommonUtils {
               size: 16.0,
             ),
           ),
-          const SizedBox(width: 10.0),
+          const SizedBox(width: 8.0),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  value,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14.0,
-                    color: Colors.black87,
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    value,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14.0,
+                      color: Colors.black87,
+                      height: 1.2,
+                    ),
                   ),
                 ),
+                const SizedBox(height: 2.0),
                 Text(
                   label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 10.0,
                     color: Colors.grey.shade600,
                     fontWeight: FontWeight.w500,
+                    height: 1.2,
                   ),
                 ),
               ],

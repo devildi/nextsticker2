@@ -488,15 +488,19 @@ class NativeView implements PlatformView, MethodChannel.MethodCallHandler, Route
                                                 result.getTargetPos());
                                         walkRouteOverlay.setCustomColor(routeColor);
                                         walkRouteOverlay.setNodeIconVisibility(false);
-                                        walkRouteOverlay.setCustomWidth(14f); // Thinner day routes
+                                        walkRouteOverlay.setCustomWidth(12f); // Clear, elegant day route width
                                         walkRouteOverlay.setZIndex(2.0f);     // High priority
+                                        walkRouteOverlay.setOffsetMeters(3.5); // 沿行进方向向右微幅偏移 3.5 米，双向重叠路段分流互不遮挡
                                         walkRouteOverlay.addToMap();
                                         add(PolyLines, walkRouteOverlay.allPolyLines);
 
-                                        // 计算折线的中点
-                                        List<LatLng> allPoints = new ArrayList<>();
-                                        for (WalkStep step : walkPath.getSteps()) {
-                                            allPoints.addAll(AMapServicesUtil.convertArrList(step.getPolyline()));
+                                        // 计算折线的中点 (使用偏移后的实际绘制点位，使中点气泡也对应各自分离的路线)
+                                        List<LatLng> allPoints = walkRouteOverlay.getDrawnPoints();
+                                        if (allPoints == null || allPoints.isEmpty()) {
+                                            allPoints = new ArrayList<>();
+                                            for (WalkStep step : walkPath.getSteps()) {
+                                                allPoints.addAll(AMapServicesUtil.convertArrList(step.getPolyline()));
+                                            }
                                         }
                                         LatLng midLatLng;
                                         if (!allPoints.isEmpty()) {
